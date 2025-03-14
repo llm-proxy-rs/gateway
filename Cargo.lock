@@ -2964,6 +2964,7 @@ dependencies = [
  "tower-sessions",
  "tracing",
  "tracing-subscriber",
+ "users",
 ]
 
 [[package]]

@@ -18,3 +18,4 @@ tokio = { version = "1.44.1", features = ["full"] }
 tower-sessions = "0.14.0"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+users = { path = "../users" }

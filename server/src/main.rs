@@ -17,6 +17,7 @@ use std::env;
 use std::sync::Arc;
 use tower_sessions::{MemoryStore, Session, SessionManagerLayer, cookie::SameSite};
 use tracing::{debug, error, info};
+use users::create_user;
 
 mod error;
 
@@ -44,8 +45,8 @@ struct AppConfig {
 }
 
 async fn chat_completions(
-    State(state): State<AppState>,
     headers: HeaderMap,
+    state: State<AppState>,
     Json(payload): Json<ChatCompletionsRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!(
@@ -53,12 +54,22 @@ async fn chat_completions(
         payload.model
     );
 
-    if let Err(err) = validate_api_key(&state.db_pool, &headers).await {
-        error!("API key validation failed: {}", err);
-        return Err(AppError::from(anyhow::anyhow!(
-            "Invalid or missing API key: {}",
-            err
-        )));
+    match validate_api_key(&state.db_pool, &headers).await {
+        Ok(valid) => {
+            if !valid {
+                error!("API key validation failed: Invalid API key");
+                return Err(AppError::from(anyhow::anyhow!(
+                    "Invalid or missing API key"
+                )));
+            }
+        }
+        Err(err) => {
+            error!("API key validation failed: {}", err);
+            return Err(AppError::from(anyhow::anyhow!(
+                "Invalid or missing API key: {}",
+                err
+            )));
+        }
     }
 
     if payload.stream == Some(false) {
@@ -78,11 +89,11 @@ async fn chat_completions(
     Ok((StatusCode::OK, stream))
 }
 
-async fn index(session: Session) -> Result<Response, AppError> {
+async fn index(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let email = session.get::<String>("email").await?;
 
     let html = match email {
-        Some(email) => format!(
+        Some(ref email) => format!(
             r#"
             <!DOCTYPE html>
             <html>
@@ -108,6 +119,10 @@ async fn index(session: Session) -> Result<Response, AppError> {
         "#
         .to_string(),
     };
+
+    if let Some(ref email) = email {
+        let _ = create_user(&state.db_pool, email).await;
+    }
 
     Ok(Html(html).into_response())
 }
@@ -145,10 +160,7 @@ async fn callback(
     Ok(handlers::callback(query, session, state).await?)
 }
 
-async fn generate_api_key(
-    session: Session,
-    State(state): State<AppState>,
-) -> Result<Response, AppError> {
+async fn generate_api_key(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
@@ -215,7 +227,7 @@ async fn load_config() -> anyhow::Result<(String, u16, String, AppConfig)> {
 }
 
 async fn setup_database(database_url: &str) -> anyhow::Result<PgPool> {
-    info!("Connecting to database at {}", database_url);
+    info!("Connecting to database");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)

@@ -44,7 +44,7 @@ pub async fn validate_api_key(pool: &PgPool, headers: &HeaderMap) -> anyhow::Res
                 None
             }
         })
-        .context("Missing API key")?;
+        .context("Missing API key in Authorization header")?;
 
     api_key_exists(pool, api_key).await
 }
