@@ -1,0 +1,14 @@
+# Server Configuration
+host = "127.0.0.1"
+port = 3000
+
+# Database Configuration
+database_url = "postgres://postgres:postgres@localhost/gateway"
+
+# AWS Cognito Configuration
+cognito_client_id = "your_cognito_client_id"
+cognito_client_secret = "your_cognito_client_secret"
+cognito_region = "us-east-1"
+cognito_user_pool_id = "us-east-1_xxxxxxxx"
+cognito_redirect_uri = "http://localhost:3000/callback"
+cognito_domain = "your-domain.auth.us-east-1.amazoncognito.com" 
