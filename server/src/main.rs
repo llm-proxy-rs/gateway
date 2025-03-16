@@ -1,4 +1,5 @@
-use apikeys::validate_api_key;
+use anyhow::Context;
+use apikeys::get_api_key;
 use axum::{
     Json, Router,
     extract::{Query, State},
@@ -47,36 +48,43 @@ struct AppConfig {
 async fn chat_completions(
     headers: HeaderMap,
     state: State<AppState>,
-    Json(payload): Json<ChatCompletionsRequest>,
+    Json(mut payload): Json<ChatCompletionsRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!(
         "Received chat completions request for model: {}",
         payload.model
     );
 
-    match validate_api_key(&state.db_pool, &headers).await {
-        Ok(valid) => {
-            if !valid {
-                error!("API key validation failed: Invalid API key");
-                return Err(AppError::from(anyhow::anyhow!(
-                    "Invalid or missing API key"
-                )));
-            }
-        }
-        Err(err) => {
-            error!("API key validation failed: {}", err);
-            return Err(AppError::from(anyhow::anyhow!(
-                "Invalid or missing API key: {}",
-                err
-            )));
-        }
+    let api_key = get_api_key(&headers)
+        .await
+        .context("Missing API key in Authorization header")?;
+
+    let (api_key_exists, model_name_exists) =
+        select_exists_api_key_and_model_name(&state.db_pool, &api_key, &payload.model).await?;
+
+    if !api_key_exists {
+        error!("API key validation failed: Invalid API key");
+        return Err(AppError::from(anyhow::anyhow!(
+            "Invalid or missing API key"
+        )));
     }
 
-    if payload.stream == Some(false) {
+    if !model_name_exists {
+        error!("Model name validation failed: Invalid model name");
+        return Err(AppError::from(anyhow::anyhow!(
+            "Invalid or missing model name"
+        )));
+    }
+
+    if payload.stream != Some(true) {
         error!("Streaming is required but was disabled");
         return Err(AppError::from(anyhow::anyhow!(
             "Streaming is required but was disabled"
         )));
+    }
+
+    if payload.model.starts_with("bedrock/") {
+        payload.model = payload.model.replace("bedrock/", "");
     }
 
     let provider = BedrockChatCompletionsProvider::new().await;
@@ -237,6 +245,26 @@ async fn setup_database(database_url: &str) -> anyhow::Result<PgPool> {
     info!("Database connection established");
 
     Ok(pool)
+}
+
+async fn select_exists_api_key_and_model_name(
+    db_pool: &PgPool,
+    api_key: &str,
+    model_name: &str,
+) -> anyhow::Result<(bool, bool)> {
+    let result: (bool, bool) = sqlx::query_as(
+        r#"
+        SELECT 
+            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1),
+            EXISTS (SELECT 1 FROM models WHERE model_name = $2);
+        "#,
+    )
+    .bind(api_key)
+    .bind(model_name)
+    .fetch_one(db_pool)
+    .await?;
+
+    Ok(result)
 }
 
 #[tokio::main]
