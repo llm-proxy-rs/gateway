@@ -18,8 +18,8 @@ use std::env;
 use std::sync::Arc;
 use tower_sessions::{MemoryStore, Session, SessionManagerLayer, cookie::SameSite};
 use tracing::{debug, error, info};
+use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
-
 mod error;
 
 use crate::error::AppError;
@@ -83,6 +83,8 @@ async fn chat_completions(
         )));
     }
 
+    let model_name = payload.model.clone();
+
     if payload.model.starts_with("bedrock/") {
         payload.model = payload.model.replace("bedrock/", "");
     }
@@ -93,7 +95,28 @@ async fn chat_completions(
         payload.messages.len()
     );
 
-    let stream = provider.chat_completions_stream(payload).await?;
+    let stream = provider
+        .chat_completions_stream(payload, move |usage| {
+            info!(
+                "Usage: prompt_tokens: {}, completion_tokens: {}, total_tokens: {}",
+                usage.prompt_tokens, usage.completion_tokens, usage.total_tokens
+            );
+
+            let db_pool = state.db_pool.clone();
+            let create_usage_request = CreateUsageRequest {
+                api_key: api_key.clone(),
+                model_name: model_name.clone(),
+                input_tokens: usage.prompt_tokens,
+                output_tokens: usage.completion_tokens,
+            };
+
+            tokio::spawn(async move {
+                if let Err(e) = create_usage(&db_pool, create_usage_request).await {
+                    error!("Failed to create usage: {}", e);
+                }
+            });
+        })
+        .await?;
     Ok((StatusCode::OK, stream))
 }
 
@@ -101,20 +124,28 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
     let email = session.get::<String>("email").await?;
 
     let html = match email {
-        Some(ref email) => format!(
-            r#"
-            <!DOCTYPE html>
-            <html>
-            <body>
-                <div>
-                    <h1>Welcome, {email}!</h1>
-                    <a href="/logout">Logout</a>
-                    <a href="/generate-api-key">Generate API Key</a>
-                </div>
-            </body>
-            </html>
-            "#
-        ),
+        Some(ref email) => {
+            let total_spent = users::get_total_spent(&state.db_pool, email)
+                .await
+                .unwrap_or_default();
+
+            format!(
+                r#"
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <div>
+                        <h1>Welcome, {email}!</h1>
+                        <p>Total spent: ${total_spent}</p>
+                        <a href="/logout">Logout</a>
+                        <a href="/generate-api-key">Generate API Key</a>
+                        <a href="/usage-history">View Usage History</a>
+                    </div>
+                </body>
+                </html>
+                "#
+            )
+        }
         None => r#"
             <!DOCTYPE html>
             <html>
@@ -191,6 +222,87 @@ async fn generate_api_key(session: Session, state: State<AppState>) -> Result<Re
         </html>
         "#,
         api_key
+    );
+
+    Ok(Html(html).into_response())
+}
+
+async fn usage_history(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+    let email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let usage_records = get_usage_records(&state.db_pool, &email, 100).await?;
+
+    let mut rows = String::new();
+    for record in usage_records {
+        let total_tokens = record.total_input_tokens + record.total_output_tokens;
+
+        rows.push_str(&format!(
+            r#"<tr>
+                <td>{}</td>
+                <td>{}</td>
+                <td>{}</td>
+                <td>${}</td>
+                <td>{}</td>
+                <td>{}</td>
+            </tr>"#,
+            record.model_name,
+            total_tokens,
+            record.created_at,
+            record.total_cost(),
+            record.total_input_tokens,
+            record.total_output_tokens
+        ));
+    }
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin: 20px 0;
+                }}
+                th, td {{
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }}
+                th {{
+                    background-color: #f2f2f2;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f9f9f9;
+                }}
+            </style>
+        </head>
+        <body>
+            <div>
+                <h1>Last 100 Usage Records for {email}</h1>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Total Tokens</th>
+                            <th>Date</th>
+                            <th>Cost</th>
+                            <th>Input Tokens</th>
+                            <th>Output Tokens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows}
+                    </tbody>
+                </table>
+                <a href="/">Back to Home</a>
+            </div>
+        </body>
+        </html>
+        "#
     );
 
     Ok(Html(html).into_response())
@@ -312,6 +424,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/login", get(login))
         .route("/logout", get(logout))
         .route("/generate-api-key", get(generate_api_key))
+        .route("/usage-history", get(usage_history))
         .layer(session_layer)
         .with_state(app_state);
 
