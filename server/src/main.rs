@@ -18,7 +18,7 @@ use std::env;
 use std::sync::Arc;
 use tower_sessions::{MemoryStore, Session, SessionManagerLayer, cookie::SameSite};
 use tracing::{debug, error, info};
-use usage::{CreateUsageRequest, create_usage, get_user_usage_history};
+use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
 mod error;
 
@@ -127,7 +127,7 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
         Some(ref email) => {
             let total_spent = users::get_total_spent(&state.db_pool, email)
                 .await
-                .unwrap_or(0.0);
+                .unwrap_or_default();
 
             format!(
                 r#"
@@ -233,7 +233,7 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    let usage_records = get_user_usage_history(&state.db_pool, &email, 100).await?;
+    let usage_records = get_usage_records(&state.db_pool, &email, 100).await?;
 
     let mut rows = String::new();
     for record in usage_records {
@@ -282,7 +282,7 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
         </head>
         <body>
             <div>
-                <h1>Usage History for {email}</h1>
+                <h1>Last 100 Usage Records for {email}</h1>
                 <table>
                     <thead>
                         <tr>

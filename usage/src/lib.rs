@@ -67,7 +67,7 @@ pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Re
         )
         UPDATE users u
         SET 
-            total_spent = ROUND((u.total_spent + ui.total_cost)::numeric, 6),
+            total_spent = (u.total_spent + ui.total_cost)::numeric,
             total_tokens = u.total_tokens + ui.total_tokens,
             updated_at = now()
         FROM usage_insert ui
@@ -85,7 +85,7 @@ pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Re
     Ok(())
 }
 
-pub async fn get_user_usage_history(pool: &PgPool, email: &str, limit: i64) -> Result<Vec<Usage>> {
+pub async fn get_usage_records(pool: &PgPool, email: &str, limit: i64) -> Result<Vec<Usage>> {
     let records = sqlx::query_as!(
         Usage,
         r#"
