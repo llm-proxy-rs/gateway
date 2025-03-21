@@ -362,8 +362,9 @@ async fn models(
 
 async fn load_config() -> anyhow::Result<AppConfig> {
     let settings = Config::builder()
-        .add_source(File::with_name("config"))
-        .build()?;
+        .add_source(File::with_name("config").required(false))
+        .build()
+        .unwrap_or_default();
 
     let host: String = settings
         .get("host")

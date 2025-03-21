@@ -35,7 +35,7 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
     Ok(models)
 }
 
-pub fn to_models_response(models: &Vec<Model>) -> ModelsResponse {
+pub fn to_models_response(models: &[Model]) -> ModelsResponse {
     let data = models
         .iter()
         .map(|model| Data {
