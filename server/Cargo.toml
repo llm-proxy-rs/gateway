@@ -11,9 +11,10 @@ chat = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.
 config = "0.15.11"
 dotenv = "0.15.0"
 handlers = { git = "https://github.com/llm-proxy-rs/cognito.git", version = "0.1.0" }
+models = { path = "../models" }
 request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
-response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 reqwest = "0.12.14"
+response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 sqlx = { version = "0.8.3", features = ["postgres"] }
 tokio = { version = "1.44.1", features = ["full"] }
 tower-sessions = "0.14.0"
