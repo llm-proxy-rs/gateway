@@ -15,6 +15,7 @@ use chat::{
 use config::{Config, File};
 use dotenv::dotenv;
 use handlers::CallbackQuery;
+use models::{get_models, to_models_response};
 use request::ChatCompletionsRequest;
 use response::Usage;
 use sqlx::PgPool;
@@ -336,6 +337,34 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
     Ok(Html(html).into_response())
 }
 
+async fn models(
+    headers: HeaderMap,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
+    let api_key = get_api_key(&headers)
+        .await
+        .context("Missing API key in Authorization header")?;
+
+    let api_key_exists = select_exists_api_key(&state.db_pool, &api_key).await?;
+
+    if !api_key_exists {
+        return Err(AppError::from(anyhow::anyhow!(
+            "Invalid or missing API key"
+        )));
+    }
+
+    match get_models(&state.db_pool).await {
+        Ok(models) => {
+            let response = to_models_response(&models);
+            Ok(Json(response).into_response())
+        }
+        Err(e) => {
+            tracing::error!("Failed to get models: {:?}", e);
+            Ok((StatusCode::INTERNAL_SERVER_ERROR, "Failed to get models").into_response())
+        }
+    }
+}
+
 async fn load_config() -> anyhow::Result<AppConfig> {
     let settings = Config::builder()
         .add_source(File::with_name("config"))
@@ -422,6 +451,19 @@ async fn select_exists_api_key_and_model_name(
     Ok(result)
 }
 
+async fn select_exists_api_key(db_pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {
+    let result: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1)
+        "#,
+    )
+    .bind(api_key)
+    .fetch_one(db_pool)
+    .await?;
+
+    Ok(result)
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
@@ -469,6 +511,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/logout", get(logout))
         .route("/generate-api-key", get(generate_api_key))
         .route("/usage-history", get(usage_history))
+        .route("/models", get(models))
         .layer(session_layer)
         .with_state(app_state);
 

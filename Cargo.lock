@@ -2149,6 +2149,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "models"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "sqlx",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3274,6 +3283,7 @@ dependencies = [
  "config",
  "dotenv",
  "handlers",
+ "models",
  "request",
  "reqwest",
  "response",

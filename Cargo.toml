@@ -1,3 +1,3 @@
 [workspace]
 
-members = [ "apikeys", "server", "usage", "users"]
+members = [ "apikeys", "models", "server", "usage", "users"]
