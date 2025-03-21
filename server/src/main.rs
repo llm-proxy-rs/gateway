@@ -353,16 +353,11 @@ async fn models(
         )));
     }
 
-    match get_models(&state.db_pool).await {
-        Ok(models) => {
-            let response = to_models_response(&models);
-            Ok(Json(response).into_response())
-        }
-        Err(e) => {
-            tracing::error!("Failed to get models: {:?}", e);
-            Ok((StatusCode::INTERNAL_SERVER_ERROR, "Failed to get models").into_response())
-        }
-    }
+    let models = get_models(&state.db_pool).await?;
+
+    let models_response = to_models_response(&models);
+
+    Ok(Json(models_response).into_response())
 }
 
 async fn load_config() -> anyhow::Result<AppConfig> {
