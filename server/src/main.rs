@@ -1,17 +1,22 @@
+use crate::error::AppError;
 use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json, Router,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Redirect, Response, sse::Sse},
     routing::{get, post},
 };
-use chat::providers::{BedrockChatCompletionsProvider, ChatCompletionsProvider};
+use chat::{
+    openai::OpenAIChatCompletionsProvider,
+    providers::{BedrockChatCompletionsProvider, ChatCompletionsProvider},
+};
 use config::{Config, File};
 use dotenv::dotenv;
 use handlers::CallbackQuery;
 use request::ChatCompletionsRequest;
+use response::Usage;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
@@ -20,19 +25,19 @@ use tower_sessions::{MemoryStore, Session, SessionManagerLayer, cookie::SameSite
 use tracing::{debug, error, info};
 use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
-mod error;
 
-use crate::error::AppError;
+mod error;
 
 #[derive(Clone)]
 struct AppState {
-    db_pool: Arc<PgPool>,
     cognito_client_id: String,
     cognito_client_secret: String,
     cognito_domain: String,
     cognito_redirect_uri: String,
     cognito_region: String,
     cognito_user_pool_id: String,
+    db_pool: Arc<PgPool>,
+    openai_api_key: Option<String>,
 }
 
 #[derive(Clone)]
@@ -43,11 +48,15 @@ struct AppConfig {
     cognito_redirect_uri: String,
     cognito_region: String,
     cognito_user_pool_id: String,
+    database_url: String,
+    host: String,
+    openai_api_key: Option<String>,
+    port: u16,
 }
 
 async fn chat_completions(
     headers: HeaderMap,
-    state: State<AppState>,
+    State(state): State<AppState>,
     Json(mut payload): Json<ChatCompletionsRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     debug!(
@@ -83,41 +92,60 @@ async fn chat_completions(
         )));
     }
 
+    payload.model = payload.model.to_lowercase();
+
     let model_name = payload.model.clone();
 
-    if payload.model.starts_with("bedrock/") {
+    let usage_callback = move |usage: &Usage| {
+        info!(
+            "Usage: prompt_tokens: {}, completion_tokens: {}, total_tokens: {}",
+            usage.prompt_tokens, usage.completion_tokens, usage.total_tokens
+        );
+
+        let db_pool = state.db_pool.clone();
+        let create_usage_request = CreateUsageRequest {
+            api_key: api_key.clone(),
+            model_name: model_name.clone(),
+            input_tokens: usage.prompt_tokens,
+            output_tokens: usage.completion_tokens,
+        };
+
+        tokio::spawn(async move {
+            if let Err(e) = create_usage(&db_pool, create_usage_request).await {
+                error!("Failed to create usage: {}", e);
+            }
+        });
+    };
+
+    let stream = if payload.model.starts_with("openai/") {
+        payload.model = payload.model.replace("openai/", "");
+        info!("Using OpenAI provider for model: {}", payload.model);
+        if let Some(openai_api_key) = &state.openai_api_key {
+            if openai_api_key.is_empty() {
+                error!("OpenAI API key is empty but OpenAI model was requested");
+                return Err(AppError::from(anyhow::anyhow!(
+                    "OpenAI API key is empty but OpenAI model was requested"
+                )));
+            }
+            OpenAIChatCompletionsProvider::new(openai_api_key)
+                .chat_completions_stream(payload, usage_callback)
+                .await?
+        } else {
+            error!("OpenAI API key is not configured but OpenAI model was requested");
+            return Err(AppError::from(anyhow::anyhow!(
+                "OpenAI API key is not configured but OpenAI model was requested"
+            )));
+        }
+    } else {
         payload.model = payload.model.replace("bedrock/", "");
-    }
+        info!("Using Bedrock provider for model: {}", payload.model);
+        BedrockChatCompletionsProvider::new()
+            .await
+            .chat_completions_stream(payload, usage_callback)
+            .await?
+    };
 
-    let provider = BedrockChatCompletionsProvider::new().await;
-    info!(
-        "Processing chat completions request with {} messages",
-        payload.messages.len()
-    );
-
-    let stream = provider
-        .chat_completions_stream(payload, move |usage| {
-            info!(
-                "Usage: prompt_tokens: {}, completion_tokens: {}, total_tokens: {}",
-                usage.prompt_tokens, usage.completion_tokens, usage.total_tokens
-            );
-
-            let db_pool = state.db_pool.clone();
-            let create_usage_request = CreateUsageRequest {
-                api_key: api_key.clone(),
-                model_name: model_name.clone(),
-                input_tokens: usage.prompt_tokens,
-                output_tokens: usage.completion_tokens,
-            };
-
-            tokio::spawn(async move {
-                if let Err(e) = create_usage(&db_pool, create_usage_request).await {
-                    error!("Failed to create usage: {}", e);
-                }
-            });
-        })
-        .await?;
-    Ok((StatusCode::OK, stream))
+    Ok((StatusCode::OK, Sse::new(stream)))
 }
 
 async fn index(session: Session, state: State<AppState>) -> Result<Response, AppError> {
@@ -308,7 +336,7 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
     Ok(Html(html).into_response())
 }
 
-async fn load_config() -> anyhow::Result<(String, u16, String, AppConfig)> {
+async fn load_config() -> anyhow::Result<AppConfig> {
     let settings = Config::builder()
         .add_source(File::with_name("config"))
         .build()?;
@@ -322,28 +350,43 @@ async fn load_config() -> anyhow::Result<(String, u16, String, AppConfig)> {
             .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/gateway".to_string())
     });
 
-    let cognito_config = AppConfig {
+    let openai_api_key = settings
+        .get::<String>("openai_api_key")
+        .ok()
+        .or_else(|| env::var("OPENAI_API_KEY").ok());
+
+    if openai_api_key.is_some() {
+        info!("OpenAI API key found in configuration");
+    } else {
+        info!("No OpenAI API key found in configuration, OpenAI models will not be available");
+    }
+
+    let app_config = AppConfig {
         cognito_client_id: settings
             .get("cognito_client_id")
             .unwrap_or_else(|_| env::var("COGNITO_CLIENT_ID").unwrap_or_default()),
         cognito_client_secret: settings
             .get("cognito_client_secret")
             .unwrap_or_else(|_| env::var("COGNITO_CLIENT_SECRET").unwrap_or_default()),
+        cognito_domain: settings
+            .get("cognito_domain")
+            .unwrap_or_else(|_| env::var("COGNITO_DOMAIN").unwrap_or_default()),
+        cognito_redirect_uri: settings
+            .get("cognito_redirect_uri")
+            .unwrap_or_else(|_| env::var("COGNITO_REDIRECT_URI").unwrap_or_default()),
         cognito_region: settings.get("cognito_region").unwrap_or_else(|_| {
             env::var("COGNITO_REGION").unwrap_or_else(|_| "us-east-1".to_string())
         }),
         cognito_user_pool_id: settings
             .get("cognito_user_pool_id")
             .unwrap_or_else(|_| env::var("COGNITO_USER_POOL_ID").unwrap_or_default()),
-        cognito_redirect_uri: settings
-            .get("cognito_redirect_uri")
-            .unwrap_or_else(|_| env::var("COGNITO_REDIRECT_URI").unwrap_or_default()),
-        cognito_domain: settings
-            .get("cognito_domain")
-            .unwrap_or_else(|_| env::var("COGNITO_DOMAIN").unwrap_or_default()),
+        database_url,
+        host,
+        openai_api_key,
+        port,
     };
 
-    Ok((host, port, database_url, cognito_config))
+    Ok(app_config)
 }
 
 async fn setup_database(database_url: &str) -> anyhow::Result<PgPool> {
@@ -385,15 +428,15 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     info!("Initializing LLM proxy server");
 
-    let (host, port, database_url, cognito_config) = load_config().await?;
-    info!("Starting server on {}:{}", host, port);
+    let app_config = load_config().await?;
+    info!("Starting server on {}:{}", app_config.host, app_config.port);
 
-    let db_pool = Arc::new(setup_database(&database_url).await?);
+    let db_pool = Arc::new(setup_database(&app_config.database_url).await?);
     info!("Database connection pool established");
 
-    if cognito_config.cognito_client_id.is_empty()
-        || cognito_config.cognito_client_secret.is_empty()
-        || cognito_config.cognito_domain.is_empty()
+    if app_config.cognito_client_id.is_empty()
+        || app_config.cognito_client_secret.is_empty()
+        || app_config.cognito_domain.is_empty()
     {
         error!(
             "Missing required Cognito configuration. Please check your config file or environment variables."
@@ -403,13 +446,14 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app_state = AppState {
+        cognito_client_id: app_config.cognito_client_id,
+        cognito_client_secret: app_config.cognito_client_secret,
+        cognito_domain: app_config.cognito_domain,
+        cognito_redirect_uri: app_config.cognito_redirect_uri,
+        cognito_region: app_config.cognito_region,
+        cognito_user_pool_id: app_config.cognito_user_pool_id,
         db_pool,
-        cognito_client_id: cognito_config.cognito_client_id,
-        cognito_client_secret: cognito_config.cognito_client_secret,
-        cognito_domain: cognito_config.cognito_domain,
-        cognito_redirect_uri: cognito_config.cognito_redirect_uri,
-        cognito_region: cognito_config.cognito_region,
-        cognito_user_pool_id: cognito_config.cognito_user_pool_id,
+        openai_api_key: app_config.openai_api_key,
     };
 
     let session_store = MemoryStore::default();
@@ -428,8 +472,12 @@ async fn main() -> anyhow::Result<()> {
         .layer(session_layer)
         .with_state(app_state);
 
-    info!("Routes configured, binding to {}:{}", host, port);
-    let listener = tokio::net::TcpListener::bind(format!("{}:{}", host, port)).await?;
+    info!(
+        "Routes configured, binding to {}:{}",
+        app_config.host, app_config.port
+    );
+    let listener =
+        tokio::net::TcpListener::bind(format!("{}:{}", app_config.host, app_config.port)).await?;
     info!("Server started successfully, listening for requests");
 
     axum::serve(listener, app).await?;
