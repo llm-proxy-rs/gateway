@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            m.model_name,\n            u.total_input_tokens,\n            u.total_output_tokens,\n            u.total_input_cost::float8 AS total_input_cost,\n            u.total_output_cost::float8 AS total_output_cost,\n            u.created_at\n        FROM \n            usage u\n        JOIN \n            models m ON u.model_id = m.model_id\n        JOIN \n            users usr ON u.user_id = usr.user_id\n        WHERE \n            usr.email = $1\n        ORDER BY \n            u.created_at DESC\n        LIMIT $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_input_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_output_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_input_cost",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "total_output_cost",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "9636ae311d42e23cd7118f77f575151f00c962114b133719d926a2ed11a87ecc"
+}
