@@ -16,7 +16,7 @@
     ${pkgs.sqlx-cli}/bin/sqlx migrate run
 
     echo "Starting gateway server..."
-    exec server
+    exec ${rustPackage}/bin/server
   '';
   migrations = pkgs.runCommand "migrations" {} ''
     mkdir -p $out/migrations
@@ -35,7 +35,6 @@ in
         entrypointScript
         migrations
         pkgs.dockerTools.caCertificates
-        rustPackage
       ];
     };
   }
