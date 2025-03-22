@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: master
+    branches: test
 jobs:
   build:
     permissions:
@@ -23,5 +23,5 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: |
           docker load < result
-          docker tag gateway:latest ghcr.io/llm-proxy-rs/gateway:latest
-          docker push ghcr.io/llm-proxy-rs/gateway:latest
+          docker tag gateway:latest ghcr.io/llm-proxy-rs/gateway:test
+          docker push ghcr.io/llm-proxy-rs/gateway:test
