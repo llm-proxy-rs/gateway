@@ -3287,6 +3287,7 @@ dependencies = [
  "request",
  "reqwest",
  "response",
+ "serde",
  "sqlx",
  "tokio",
  "tower-sessions",

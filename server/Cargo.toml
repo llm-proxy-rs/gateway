@@ -15,6 +15,7 @@ models = { path = "../models" }
 request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 reqwest = "0.12.14"
 response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
+serde = "1.0.219"
 sqlx = { version = "0.8.3", features = ["postgres"] }
 tokio = { version = "1.44.1", features = ["full"] }
 tower-sessions = "0.14.0"

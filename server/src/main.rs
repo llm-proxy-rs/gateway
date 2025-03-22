@@ -12,15 +12,15 @@ use chat::{
     openai::OpenAIChatCompletionsProvider,
     providers::{BedrockChatCompletionsProvider, ChatCompletionsProvider},
 };
-use config::{Config, File};
+use config::{Config, Environment, File};
 use dotenv::dotenv;
 use handlers::CallbackQuery;
 use models::{get_models, to_models_response};
 use request::ChatCompletionsRequest;
 use response::Usage;
+use serde::Deserialize;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-use std::env;
 use std::sync::Arc;
 use tower_sessions::{MemoryStore, Session, SessionManagerLayer, cookie::SameSite};
 use tracing::{debug, error, info};
@@ -41,7 +41,7 @@ struct AppState {
     openai_api_key: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 struct AppConfig {
     cognito_client_id: String,
     cognito_client_secret: String,
@@ -49,10 +49,25 @@ struct AppConfig {
     cognito_redirect_uri: String,
     cognito_region: String,
     cognito_user_pool_id: String,
+    #[serde(default = "default_database_url")]
     database_url: String,
+    #[serde(default = "default_host")]
     host: String,
     openai_api_key: Option<String>,
+    #[serde(default = "default_port")]
     port: u16,
+}
+
+fn default_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_port() -> u16 {
+    3000
+}
+
+fn default_database_url() -> String {
+    "postgres://postgres:postgres@localhost/gateway".to_string()
 }
 
 async fn chat_completions(
@@ -361,55 +376,17 @@ async fn models(
 }
 
 async fn load_config() -> anyhow::Result<AppConfig> {
-    let settings = Config::builder()
+    let app_config: AppConfig = Config::builder()
         .add_source(File::with_name("config").required(false))
-        .build()
-        .unwrap_or_default();
+        .add_source(Environment::default())
+        .build()?
+        .try_deserialize()?;
 
-    let host: String = settings
-        .get("host")
-        .unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port: u16 = settings.get("port").unwrap_or(3000);
-    let database_url: String = settings.get("database_url").unwrap_or_else(|_| {
-        env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/gateway".to_string())
-    });
-
-    let openai_api_key = settings
-        .get::<String>("openai_api_key")
-        .ok()
-        .or_else(|| env::var("OPENAI_API_KEY").ok());
-
-    if openai_api_key.is_some() {
+    if app_config.openai_api_key.is_some() {
         info!("OpenAI API key found in configuration");
     } else {
         info!("No OpenAI API key found in configuration, OpenAI models will not be available");
     }
-
-    let app_config = AppConfig {
-        cognito_client_id: settings
-            .get("cognito_client_id")
-            .unwrap_or_else(|_| env::var("COGNITO_CLIENT_ID").unwrap_or_default()),
-        cognito_client_secret: settings
-            .get("cognito_client_secret")
-            .unwrap_or_else(|_| env::var("COGNITO_CLIENT_SECRET").unwrap_or_default()),
-        cognito_domain: settings
-            .get("cognito_domain")
-            .unwrap_or_else(|_| env::var("COGNITO_DOMAIN").unwrap_or_default()),
-        cognito_redirect_uri: settings
-            .get("cognito_redirect_uri")
-            .unwrap_or_else(|_| env::var("COGNITO_REDIRECT_URI").unwrap_or_default()),
-        cognito_region: settings.get("cognito_region").unwrap_or_else(|_| {
-            env::var("COGNITO_REGION").unwrap_or_else(|_| "us-east-1".to_string())
-        }),
-        cognito_user_pool_id: settings
-            .get("cognito_user_pool_id")
-            .unwrap_or_else(|_| env::var("COGNITO_USER_POOL_ID").unwrap_or_default()),
-        database_url,
-        host,
-        openai_api_key,
-        port,
-    };
 
     Ok(app_config)
 }
