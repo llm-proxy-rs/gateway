@@ -22,7 +22,10 @@ use serde::Deserialize;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
-use tower_sessions::{MemoryStore, Session, SessionManagerLayer, cookie::SameSite};
+use tokio::signal;
+use tokio::task::AbortHandle;
+use tower_sessions::{ExpiredDeletion, Expiry, Session, SessionManagerLayer};
+use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{debug, error, info};
 use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
@@ -446,7 +449,7 @@ async fn main() -> anyhow::Result<()> {
     let app_config = load_config().await?;
     info!("Starting server on {}:{}", app_config.host, app_config.port);
 
-    let db_pool = Arc::new(setup_database(&app_config.database_url).await?);
+    let db_pool = setup_database(&app_config.database_url).await?;
     info!("Database connection pool established");
 
     if app_config.cognito_client_id.is_empty()
@@ -467,14 +470,22 @@ async fn main() -> anyhow::Result<()> {
         cognito_redirect_uri: app_config.cognito_redirect_uri,
         cognito_region: app_config.cognito_region,
         cognito_user_pool_id: app_config.cognito_user_pool_id,
-        db_pool,
+        db_pool: Arc::new(db_pool.clone()),
         openai_api_key: app_config.openai_api_key,
     };
 
-    let session_store = MemoryStore::default();
+    let session_store = PostgresStore::new(db_pool);
+    session_store.migrate().await?;
+
+    let deletion_task = tokio::task::spawn(
+        session_store
+            .clone()
+            .continuously_delete_expired(tokio::time::Duration::from_secs(3600)),
+    );
+
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_same_site(SameSite::Lax)
-        .with_secure(false);
+        .with_expiry(Expiry::OnInactivity(time::Duration::seconds(86400)))
+        .with_same_site(tower_sessions::cookie::SameSite::Lax);
 
     let app = Router::new()
         .route("/", get(index))
@@ -496,7 +507,35 @@ async fn main() -> anyhow::Result<()> {
         tokio::net::TcpListener::bind(format!("{}:{}", app_config.host, app_config.port)).await?;
     info!("Server started successfully, listening for requests");
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal(deletion_task.abort_handle()))
+        .await?;
+
+    deletion_task.await??;
 
     Ok(())
+}
+
+async fn shutdown_signal(deletion_task_abort_handle: AbortHandle) {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => { deletion_task_abort_handle.abort() },
+        _ = terminate => { deletion_task_abort_handle.abort() },
+    }
 }
