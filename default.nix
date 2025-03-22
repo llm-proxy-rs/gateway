@@ -9,14 +9,14 @@
     version = "0.1.0";
   };
   entrypointScript = pkgs.writeScriptBin "entrypoint.sh" ''
-    #!/bin/sh
+    #!${pkgs.bash}/bin/bash
     set -e
 
     echo "Running database migrations..."
-    sqlx migrate run
+    ${pkgs.sqlx-cli}/bin/sqlx migrate run
 
     echo "Starting gateway server..."
-    server
+    exec server
   '';
   migrations = pkgs.runCommand "migrations" {} ''
     mkdir -p $out/migrations
@@ -34,10 +34,8 @@ in
       paths = [
         entrypointScript
         migrations
-        pkgs.bash
         pkgs.dockerTools.caCertificates
         rustPackage
-        sqlx-cli
       ];
     };
   }
