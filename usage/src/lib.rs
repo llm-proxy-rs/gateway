@@ -70,7 +70,7 @@ pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Re
             total_spent = CASE
                 WHEN date_trunc('month', u.updated_at) = date_trunc('month', now())
                 THEN (u.total_spent + ui.total_cost)::numeric
-                ELSE ui.total_cost::numeric
+                ELSE ui.total_cost
             END,
             total_tokens = CASE
                 WHEN date_trunc('month', u.updated_at) = date_trunc('month', now())
