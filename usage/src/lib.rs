@@ -66,9 +66,17 @@ pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Re
                 (total_input_tokens + total_output_tokens) AS total_tokens
         )
         UPDATE users u
-        SET 
-            total_spent = (u.total_spent + ui.total_cost)::numeric,
-            total_tokens = u.total_tokens + ui.total_tokens,
+        SET
+            total_spent = CASE
+                WHEN date_trunc('month', u.updated_at) = date_trunc('month', now())
+                THEN (u.total_spent + ui.total_cost)::numeric
+                ELSE ui.total_cost::numeric
+            END,
+            total_tokens = CASE
+                WHEN date_trunc('month', u.updated_at) = date_trunc('month', now())
+                THEN u.total_tokens + ui.total_tokens
+                ELSE ui.total_tokens
+            END,
             updated_at = now()
         FROM usage_insert ui
         WHERE u.user_id = ui.user_id
@@ -104,6 +112,7 @@ pub async fn get_usage_records(pool: &PgPool, email: &str, limit: i64) -> Result
             users usr ON u.user_id = usr.user_id
         WHERE 
             usr.email = $1
+            AND date_trunc('month', u.created_at) = date_trunc('month', now())
         ORDER BY 
             u.created_at DESC
         LIMIT $2
