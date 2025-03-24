@@ -33,5 +33,5 @@ pub async fn get_total_spent(pool: &PgPool, email: &str) -> anyhow::Result<f64> 
     .fetch_one(pool)
     .await?;
 
-    Ok(result.total_spent.context("total_spent is null")?)
+    result.total_spent.context("total_spent is null")
 }
