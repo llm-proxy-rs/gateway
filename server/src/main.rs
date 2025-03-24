@@ -187,6 +187,7 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
                         <a href="/logout">Logout</a>
                         <a href="/generate-api-key">Generate API Key</a>
                         <a href="/usage-history">View Usage History</a>
+                        <a href="/browse-models">Browse Models</a>
                     </div>
                 </body>
                 </html>
@@ -355,6 +356,74 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
     Ok(Html(html).into_response())
 }
 
+async fn browse_models(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let models = get_models(&state.db_pool).await?;
+
+    let mut rows = String::new();
+    for model in models {
+        rows.push_str(&format!(
+            r#"<tr>
+                <td>{}</td>
+                <td>${}</td>
+                <td>${}</td>
+            </tr>"#,
+            model.model_name, model.input_price_per_token, model.output_price_per_token
+        ));
+    }
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin: 20px 0;
+                }}
+                th, td {{
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }}
+                th {{
+                    background-color: #f2f2f2;
+                }}
+                tr:nth-child(even) {{
+                    background-color: #f9f9f9;
+                }}
+            </style>
+        </head>
+        <body>
+            <div>
+                <h1>Available Models</h1>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Input Price Per Token</th>
+                            <th>Output Price Per Token</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows}
+                    </tbody>
+                </table>
+                <a href="/">Back to Home</a>
+            </div>
+        </body>
+        </html>
+        "#
+    );
+
+    Ok(Html(html).into_response())
+}
+
 async fn models(
     headers: HeaderMap,
     State(state): State<AppState>,
@@ -495,6 +564,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/logout", get(logout))
         .route("/generate-api-key", get(generate_api_key))
         .route("/usage-history", get(usage_history))
+        .route("/browse-models", get(browse_models))
         .route("/models", get(models))
         .layer(session_layer)
         .with_state(app_state);

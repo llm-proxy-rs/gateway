@@ -7,8 +7,8 @@
       "Left": [
         "Text",
         "Text",
-        "Numeric",
-        "Numeric"
+        "Float8",
+        "Float8"
       ]
     },
     "nullable": []
