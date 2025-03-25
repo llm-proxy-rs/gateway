@@ -1,7 +1,7 @@
 {pkgs ? import <nixpkgs> {}}: let
   rustPackage = pkgs.rustPlatform.buildRustPackage {
     buildInputs = [pkgs.openssl];
-    cargoHash = "sha256-fBAqY4JKBclO5glN0NU/mJOe9EGCKT6nfMbrX97JmOA=";
+    cargoHash = "sha256-Vtj+vHi9tu23GWvOzI3+Gz6ANbYd+AIVBMT6eeW2hcg=";
     nativeBuildInputs = [pkgs.pkg-config];
     pname = "gateway";
     src = ./.;

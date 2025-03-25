@@ -15,6 +15,7 @@ use chat::{
 use config::{Config, Environment, File};
 use dotenv::dotenv;
 use handlers::CallbackQuery;
+use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{get_models, to_models_response};
 use request::ChatCompletionsRequest;
 use response::Usage;
@@ -24,6 +25,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::task::AbortHandle;
+use tower_http::cors::{Any, CorsLayer};
 use tower_sessions::{ExpiredDeletion, Expiry, Session, SessionManagerLayer};
 use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{debug, error, info};
@@ -556,16 +558,24 @@ async fn main() -> anyhow::Result<()> {
         .with_expiry(Expiry::OnInactivity(time::Duration::seconds(86400)))
         .with_same_site(tower_sessions::cookie::SameSite::Lax);
 
+    let cors_layer = CorsLayer::new()
+        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+        .allow_origin(Any);
+
+    let api = Router::new()
+        .route("/chat/completions", post(chat_completions))
+        .route("/models", get(models))
+        .layer(cors_layer);
+
     let app = Router::new()
         .route("/", get(index))
-        .route("/chat/completions", post(chat_completions))
         .route("/callback", get(callback))
         .route("/login", get(login))
         .route("/logout", get(logout))
         .route("/generate-api-key", get(generate_api_key))
         .route("/usage-history", get(usage_history))
         .route("/browse-models", get(browse_models))
-        .route("/models", get(models))
+        .merge(api)
         .layer(session_layer)
         .with_state(app_state);
 
