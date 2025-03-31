@@ -370,9 +370,9 @@ async fn disable_api_keys_page(session: Session) -> Result<Response, AppError> {
         <html>
         <body>
             <h1>Disable API Keys</h1>
-            <p>This will disable all your API keys. This action cannot be undone.</p>
+            <p>Warning: This action will disable all API keys.</p>
             <form action="/disable-api-keys-confirm" method="post">
-                <button type="submit">Yes, Disable All API Keys</button>
+                <button type="submit">Submit</button>
             </form>
             <a href="/">Back to Home</a>
         </body>
@@ -398,15 +398,9 @@ async fn disable_api_keys_confirm(
         <!DOCTYPE html>
         <html>
         <body>
-            <div>
-                <h1>API Keys Disabled</h1>
-                <p>{} API key(s) have been disabled successfully.</p>
-                <p>Any previously generated API keys will no longer work.</p>
-                <div>
-                    <a href="/generate-api-key">Generate New API Key</a>
-                    <a href="/" style="margin-left: 20px;">Back to Home</a>
-                </div>
-            </div>
+            <h1>API Keys Disabled</h1>
+            <p>{} API key(s) disabled.</p>
+            <a href="/">Back to Home</a>
         </body>
         </html>
         "#,
