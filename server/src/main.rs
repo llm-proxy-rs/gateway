@@ -188,6 +188,7 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
                         <p>Total spent: ${total_spent}</p>
                         <a href="/logout">Logout</a>
                         <a href="/generate-api-key">Generate API Key</a>
+                        <a href="/disable-api-keys">Disable API Keys</a>
                         <a href="/usage-history">View Usage History</a>
                         <a href="/browse-models">Browse Models</a>
                     </div>
@@ -358,6 +359,85 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
     Ok(Html(html).into_response())
 }
 
+async fn disable_api_keys_page(session: Session) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let html = r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                .button {
+                    background-color: #f44336;
+                    border: none;
+                    color: white;
+                    padding: 10px 20px;
+                    text-align: center;
+                    text-decoration: none;
+                    display: inline-block;
+                    font-size: 16px;
+                    margin: 10px 0;
+                    cursor: pointer;
+                    border-radius: 4px;
+                }
+            </style>
+        </head>
+        <body>
+            <div>
+                <h1>Disable API Keys</h1>
+                <p>Warning: This action will disable all your previously generated API keys.</p>
+                <p>This action cannot be undone. You will need to generate new API keys after disabling.</p>
+                <form action="/disable-api-keys-confirm" method="post">
+                    <button type="submit" class="button">Yes, Disable All API Keys</button>
+                </form>
+                <div style="margin-top: 20px;">
+                    <a href="/">Back to Home</a>
+                </div>
+            </div>
+        </body>
+        </html>
+    "#;
+
+    Ok(Html(html).into_response())
+}
+
+async fn disable_api_keys_confirm(
+    session: Session,
+    state: State<AppState>,
+) -> Result<Response, AppError> {
+    let email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let deleted_count = apikeys::disable_all_api_keys(&state.db_pool, &email).await?;
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>API Keys Disabled</h1>
+                <p>{} API key(s) have been disabled successfully.</p>
+                <p>Any previously generated API keys will no longer work.</p>
+                <div>
+                    <a href="/generate-api-key">Generate New API Key</a>
+                    <a href="/" style="margin-left: 20px;">Back to Home</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        "#,
+        deleted_count
+    );
+
+    Ok(Html(html).into_response())
+}
+
 async fn browse_models(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let _email = match session.get::<String>("email").await? {
         Some(email) => email,
@@ -485,8 +565,8 @@ async fn select_exists_api_key_and_model_name(
 ) -> anyhow::Result<(bool, bool)> {
     let result: (bool, bool) = sqlx::query_as(
         r#"
-        SELECT 
-            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1),
+        SELECT
+            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE),
             EXISTS (SELECT 1 FROM models WHERE model_name = $2);
         "#,
     )
@@ -501,7 +581,7 @@ async fn select_exists_api_key_and_model_name(
 async fn select_exists_api_key(db_pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {
     let result: bool = sqlx::query_scalar(
         r#"
-        SELECT EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1)
+        SELECT EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE)
         "#,
     )
     .bind(api_key)
@@ -573,6 +653,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/login", get(login))
         .route("/logout", get(logout))
         .route("/generate-api-key", get(generate_api_key))
+        .route("/disable-api-keys", get(disable_api_keys_page))
+        .route("/disable-api-keys-confirm", post(disable_api_keys_confirm))
         .route("/usage-history", get(usage_history))
         .route("/browse-models", get(browse_models))
         .merge(api)
