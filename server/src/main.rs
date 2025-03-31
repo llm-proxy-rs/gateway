@@ -368,35 +368,13 @@ async fn disable_api_keys_page(session: Session) -> Result<Response, AppError> {
     let html = r#"
         <!DOCTYPE html>
         <html>
-        <head>
-            <style>
-                .button {
-                    background-color: #f44336;
-                    border: none;
-                    color: white;
-                    padding: 10px 20px;
-                    text-align: center;
-                    text-decoration: none;
-                    display: inline-block;
-                    font-size: 16px;
-                    margin: 10px 0;
-                    cursor: pointer;
-                    border-radius: 4px;
-                }
-            </style>
-        </head>
         <body>
-            <div>
-                <h1>Disable API Keys</h1>
-                <p>Warning: This action will disable all your previously generated API keys.</p>
-                <p>This action cannot be undone. You will need to generate new API keys after disabling.</p>
-                <form action="/disable-api-keys-confirm" method="post">
-                    <button type="submit" class="button">Yes, Disable All API Keys</button>
-                </form>
-                <div style="margin-top: 20px;">
-                    <a href="/">Back to Home</a>
-                </div>
-            </div>
+            <h1>Disable API Keys</h1>
+            <p>This will disable all your API keys. This action cannot be undone.</p>
+            <form action="/disable-api-keys-confirm" method="post">
+                <button type="submit">Yes, Disable All API Keys</button>
+            </form>
+            <a href="/">Back to Home</a>
         </body>
         </html>
     "#;
