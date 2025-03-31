@@ -1,4 +1,3 @@
-use crate::error::AppError;
 use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
@@ -17,6 +16,8 @@ use dotenv::dotenv;
 use handlers::CallbackQuery;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{get_models, to_models_response};
+use myerrors::AppError;
+use myhandlers::logout;
 use request::ChatCompletionsRequest;
 use response::Usage;
 use serde::Deserialize;
@@ -31,8 +32,6 @@ use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{debug, error, info};
 use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
-
-mod error;
 
 #[derive(Clone)]
 struct AppState {
@@ -217,11 +216,6 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
     Ok(Html(html).into_response())
 }
 
-async fn logout(session: Session) -> Result<Response, AppError> {
-    session.delete().await?;
-    Ok(Redirect::to("/").into_response())
-}
-
 async fn login(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let state = State(handlers::AppState {
         client_id: state.cognito_client_id.clone(),
@@ -372,7 +366,7 @@ async fn disable_api_keys_page(session: Session) -> Result<Response, AppError> {
             <h1>Disable API Keys</h1>
             <p>Warning: This action will disable all API keys.</p>
             <form action="/disable-api-keys-confirm" method="post">
-                <button type="submit">Submit</button>
+                <button type="submit">Confirm</button>
             </form>
             <a href="/">Back to Home</a>
         </body>

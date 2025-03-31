@@ -1,0 +1,9 @@
+[package]
+name = "myhandlers"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.3"
+myerrors = { path = "../myerrors" }
+tower-sessions = "0.14.0"

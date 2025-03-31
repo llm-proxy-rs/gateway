@@ -2175,6 +2175,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "myerrors"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+]
+
+[[package]]
+name = "myhandlers"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "myerrors",
+ "tower-sessions",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3330,6 +3347,8 @@ dependencies = [
  "handlers",
  "http 1.3.1",
  "models",
+ "myerrors",
+ "myhandlers",
  "request",
  "reqwest",
  "response",
