@@ -209,7 +209,7 @@ struct ApiKeyForm {
     authenticity_token: String,
 }
 
-async fn verify_csrf_token(
+async fn verify_authenticity_token(
     token: &CsrfToken,
     session: &Session,
     form_token: &str,
@@ -237,10 +237,7 @@ async fn verify_csrf_token(
     Ok(())
 }
 
-async fn generate_and_store_csrf_token(
-    token: &CsrfToken,
-    session: &Session,
-) -> Result<String, AppError> {
+async fn get_authenticity_token(token: &CsrfToken, session: &Session) -> Result<String, AppError> {
     let authenticity_token = token
         .authenticity_token()
         .map_err(|e| AppError::from(anyhow::anyhow!("Failed to generate CSRF token: {}", e)))?;
@@ -258,7 +255,7 @@ async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Resp
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    let authenticity_token = generate_and_store_csrf_token(&token, &session).await?;
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
 
     let html = format!(
         r#"
@@ -294,7 +291,7 @@ async fn generate_api_key_post(
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    verify_csrf_token(&token, &session, &form.authenticity_token).await?;
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
     let api_key = apikeys::create_api_key(&state.db_pool, &email).await?;
 
@@ -405,7 +402,7 @@ async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Resp
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    let authenticity_token = generate_and_store_csrf_token(&token, &session).await?;
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
 
     let html = format!(
         r#"
@@ -444,7 +441,7 @@ async fn disable_api_keys_post(
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    verify_csrf_token(&token, &session, &form.authenticity_token).await?;
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
     let deleted_count = apikeys::disable_all_api_keys(&state.db_pool, &email).await?;
 
