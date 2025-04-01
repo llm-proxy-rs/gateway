@@ -2287,7 +2287,9 @@ name = "myhandlers"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "handlers",
  "myerrors",
+ "sqlx",
  "tower-sessions",
 ]
 
@@ -3463,7 +3465,6 @@ dependencies = [
  "chat",
  "config",
  "dotenv",
- "handlers",
  "http 1.3.1",
  "models",
  "myerrors",

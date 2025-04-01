@@ -2,7 +2,7 @@ use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json, Router,
-    extract::{Form, Query, State},
+    extract::{Form, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response, sse::Sse},
     routing::{get, post},
@@ -14,11 +14,10 @@ use chat::{
 };
 use config::{Config, Environment, File};
 use dotenv::dotenv;
-use handlers::CallbackQuery;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{get_models, to_models_response};
 use myerrors::AppError;
-use myhandlers::logout;
+use myhandlers::{AppState, callback, login, logout};
 use request::ChatCompletionsRequest;
 use response::Usage;
 use serde::Deserialize;
@@ -33,18 +32,6 @@ use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{debug, error, info};
 use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
-
-#[derive(Clone)]
-struct AppState {
-    cognito_client_id: String,
-    cognito_client_secret: String,
-    cognito_domain: String,
-    cognito_redirect_uri: String,
-    cognito_region: String,
-    cognito_user_pool_id: String,
-    db_pool: Arc<PgPool>,
-    openai_api_key: Option<String>,
-}
 
 #[derive(Clone, Deserialize)]
 struct AppConfig {
@@ -215,34 +202,6 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
     }
 
     Ok(Html(html).into_response())
-}
-
-async fn login(session: Session, state: State<AppState>) -> Result<Response, AppError> {
-    let state = State(handlers::AppState {
-        client_id: state.cognito_client_id.clone(),
-        client_secret: state.cognito_client_secret.clone(),
-        domain: state.cognito_domain.clone(),
-        redirect_uri: state.cognito_redirect_uri.clone(),
-        region: state.cognito_region.clone(),
-        user_pool_id: state.cognito_user_pool_id.clone(),
-    });
-    Ok(handlers::login(session, state).await?)
-}
-
-async fn callback(
-    query: Query<CallbackQuery>,
-    session: Session,
-    state: State<AppState>,
-) -> Result<Response, AppError> {
-    let state = State(handlers::AppState {
-        client_id: state.cognito_client_id.clone(),
-        client_secret: state.cognito_client_secret.clone(),
-        domain: state.cognito_domain.clone(),
-        redirect_uri: state.cognito_redirect_uri.clone(),
-        region: state.cognito_region.clone(),
-        user_pool_id: state.cognito_user_pool_id.clone(),
-    });
-    Ok(handlers::callback(query, session, state).await?)
 }
 
 // Structure to receive the form submission with CSRF token
