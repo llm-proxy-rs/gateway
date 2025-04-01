@@ -209,12 +209,38 @@ struct ApiKeyForm {
     authenticity_token: String,
 }
 
-async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
-        Some(email) => email,
-        None => return Ok(Redirect::to("/login").into_response()),
+async fn verify_csrf_token(
+    token: &CsrfToken,
+    session: &Session,
+    form_token: &str,
+) -> Result<(), AppError> {
+    let stored_token: String = match session.get("authenticity_token").await? {
+        Some(token) => token,
+        None => {
+            return Err(AppError::from(anyhow::anyhow!(
+                "CSRF token not found in session"
+            )));
+        }
     };
 
+    if token.verify(form_token).is_err() {
+        return Err(AppError::from(anyhow::anyhow!("Invalid CSRF token")));
+    }
+
+    if token.verify(&stored_token).is_err() {
+        return Err(AppError::from(anyhow::anyhow!(
+            "Token mismatch or replay attack detected"
+        )));
+    }
+
+    session.remove::<String>("authenticity_token").await?;
+    Ok(())
+}
+
+async fn generate_and_store_csrf_token(
+    token: &CsrfToken,
+    session: &Session,
+) -> Result<String, AppError> {
     let authenticity_token = token
         .authenticity_token()
         .map_err(|e| AppError::from(anyhow::anyhow!("Failed to generate CSRF token: {}", e)))?;
@@ -222,6 +248,17 @@ async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Resp
     session
         .insert("authenticity_token", &authenticity_token)
         .await?;
+
+    Ok(authenticity_token)
+}
+
+async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let authenticity_token = generate_and_store_csrf_token(&token, &session).await?;
 
     let html = format!(
         r#"
@@ -249,34 +286,15 @@ async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Resp
 async fn generate_api_key_post(
     token: CsrfToken,
     session: Session,
-    State(state): State<AppState>,
-    Form(form): Form<ApiKeyForm>,
+    state: State<AppState>,
+    form: Form<ApiKeyForm>,
 ) -> Result<Response, AppError> {
     let email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    let stored_token: String = match session.get("authenticity_token").await? {
-        Some(token) => token,
-        None => {
-            return Err(AppError::from(anyhow::anyhow!(
-                "CSRF token not found in session"
-            )));
-        }
-    };
-
-    if token.verify(&form.authenticity_token).is_err() {
-        return Err(AppError::from(anyhow::anyhow!("Invalid CSRF token")));
-    }
-
-    if token.verify(&stored_token).is_err() {
-        return Err(AppError::from(anyhow::anyhow!(
-            "Token mismatch or replay attack detected"
-        )));
-    }
-
-    session.remove::<String>("authenticity_token").await?;
+    verify_csrf_token(&token, &session, &form.authenticity_token).await?;
 
     let api_key = apikeys::create_api_key(&state.db_pool, &email).await?;
 
@@ -381,24 +399,13 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
     Ok(Html(html).into_response())
 }
 
-async fn disable_api_keys_get(
-    token: CsrfToken,
-    session: Session,
-    State(_state): State<AppState>,
-) -> Result<Response, AppError> {
+async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
     let _email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    // Get the authenticity token and store it in session
-    let authenticity_token = token
-        .authenticity_token()
-        .map_err(|e| AppError::from(anyhow::anyhow!("Failed to generate CSRF token: {}", e)))?;
-
-    session
-        .insert("authenticity_token", &authenticity_token)
-        .await?;
+    let authenticity_token = generate_and_store_csrf_token(&token, &session).await?;
 
     let html = format!(
         r#"
@@ -418,11 +425,9 @@ async fn disable_api_keys_get(
         authenticity_token
     );
 
-    // Return the token to ensure it gets added to response cookies
     Ok((token, Html(html)).into_response())
 }
 
-// Structure to receive the form submission for disabling API keys with CSRF token
 #[derive(Deserialize)]
 struct DisableApiKeysForm {
     authenticity_token: String,
@@ -439,32 +444,8 @@ async fn disable_api_keys_post(
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    // Get the stored authenticity token
-    let stored_token: String = match session.get("authenticity_token").await? {
-        Some(token) => token,
-        None => {
-            return Err(AppError::from(anyhow::anyhow!(
-                "CSRF token not found in session"
-            )));
-        }
-    };
+    verify_csrf_token(&token, &session, &form.authenticity_token).await?;
 
-    // Verify the token from form
-    if token.verify(&form.authenticity_token).is_err() {
-        return Err(AppError::from(anyhow::anyhow!("Invalid CSRF token")));
-    }
-
-    // Verify the token from cookie against stored token
-    if token.verify(&stored_token).is_err() {
-        return Err(AppError::from(anyhow::anyhow!(
-            "Token mismatch or replay attack detected"
-        )));
-    }
-
-    // Remove the token to prevent reuse
-    session.remove::<String>("authenticity_token").await?;
-
-    // Disable all API keys
     let deleted_count = apikeys::disable_all_api_keys(&state.db_pool, &email).await?;
 
     let html = format!(
