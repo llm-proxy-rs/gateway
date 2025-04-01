@@ -276,15 +276,13 @@ async fn generate_api_key_get(
         <!DOCTYPE html>
         <html>
         <body>
-            <div>
-                <h1>Generate API Key</h1>
-                <p>Click the button below to generate a new API key.</p>
-                <form action="/generate-api-key" method="post">
-                    <input type="hidden" name="authenticity_token" value="{}">
-                    <button type="submit">Generate API Key</button>
-                </form>
-                <a href="/">Back to Home</a>
-            </div>
+            <h1>Generate API Key</h1>
+            <p>Click the button below to generate a new API key.</p>
+            <form action="/generate-api-key" method="post">
+                <input type="hidden" name="authenticity_token" value="{}">
+                <button type="submit">Generate API Key</button>
+            </form>
+            <a href="/">Back to Home</a>
         </body>
         </html>
         "#,
@@ -483,7 +481,7 @@ struct DisableApiKeysForm {
     authenticity_token: String,
 }
 
-async fn disable_api_keys_confirm_post(
+async fn disable_api_keys_post(
     token: CsrfToken,
     session: Session,
     state: State<AppState>,
@@ -742,30 +740,29 @@ async fn main() -> anyhow::Result<()> {
     let cors_layer = CorsLayer::new()
         .allow_headers([AUTHORIZATION, CONTENT_TYPE])
         .allow_origin(Any);
-    // Create the main application router with all routes
+
+    let api = Router::new()
+        .route("/chat/completions", post(chat_completions))
+        .route("/models", get(models))
+        .layer(cors_layer);
+
     let app = Router::new()
-        // Web UI routes
         .route("/", get(index))
-        .route("/callback", get(callback))
-        .route("/login", get(login))
-        .route("/logout", get(logout))
-        .route("/disable-api-keys", get(disable_api_keys_get))
-        .route(
-            "/disable-api-keys-confirm",
-            post(disable_api_keys_confirm_post),
-        )
-        .route("/usage-history", get(usage_history))
         .route("/browse-models", get(browse_models))
+        .route("/callback", get(callback))
+        .route(
+            "/disable-api-keys",
+            get(disable_api_keys_get).post(disable_api_keys_post),
+        )
         .route(
             "/generate-api-key",
             get(generate_api_key_get).post(generate_api_key_post),
         )
-        // API routes
-        .route("/chat/completions", post(chat_completions))
-        .route("/models", get(models))
-        // Apply all middleware layers
+        .route("/login", get(login))
+        .route("/logout", get(logout))
+        .route("/usage-history", get(usage_history))
+        .merge(api)
         .layer(CsrfLayer::new(CsrfConfig::default()))
-        .layer(cors_layer)
         .layer(session_layer)
         .with_state(app_state);
 
