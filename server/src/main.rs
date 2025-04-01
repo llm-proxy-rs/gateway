@@ -352,7 +352,7 @@ async fn generate_api_key_post(
         api_key
     );
 
-    Ok(Html(html).into_response())
+    Ok((token, Html(html)).into_response())
 }
 
 async fn usage_history(session: Session, state: State<AppState>) -> Result<Response, AppError> {
@@ -452,7 +452,7 @@ async fn disable_api_keys_get(
         .map_err(|e| AppError::from(anyhow::anyhow!("Failed to generate CSRF token: {}", e)))?;
 
     session
-        .insert("disable_api_keys_token", &authenticity_token)
+        .insert("authenticity_token", &authenticity_token)
         .await?;
 
     let html = format!(
@@ -495,7 +495,7 @@ async fn disable_api_keys_confirm_post(
     };
 
     // Get the stored authenticity token
-    let stored_token: String = match session.get("disable_api_keys_token").await? {
+    let stored_token: String = match session.get("authenticity_token").await? {
         Some(token) => token,
         None => {
             return Err(AppError::from(anyhow::anyhow!(
@@ -517,7 +517,7 @@ async fn disable_api_keys_confirm_post(
     }
 
     // Remove the token to prevent reuse
-    session.remove::<String>("disable_api_keys_token").await?;
+    session.remove::<String>("authenticity_token").await?;
 
     // Disable all API keys
     let deleted_count = apikeys::disable_all_api_keys(&state.db_pool, &email).await?;
@@ -536,7 +536,7 @@ async fn disable_api_keys_confirm_post(
         deleted_count
     );
 
-    Ok(Html(html).into_response())
+    Ok((token, Html(html)).into_response())
 }
 
 async fn browse_models(session: Session, state: State<AppState>) -> Result<Response, AppError> {
