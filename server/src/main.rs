@@ -204,24 +204,17 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
     Ok(Html(html).into_response())
 }
 
-// Structure to receive the form submission with CSRF token
 #[derive(Deserialize)]
 struct ApiKeyForm {
     authenticity_token: String,
 }
 
-// Display the API key generation form with CSRF token
-async fn generate_api_key_get(
-    token: CsrfToken,
-    session: Session,
-    State(_state): State<AppState>,
-) -> Result<Response, AppError> {
+async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
     let _email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    // Get the authenticity token and store it in session
     let authenticity_token = token
         .authenticity_token()
         .map_err(|e| AppError::from(anyhow::anyhow!("Failed to generate CSRF token: {}", e)))?;
@@ -235,24 +228,24 @@ async fn generate_api_key_get(
         <!DOCTYPE html>
         <html>
         <body>
-            <h1>Generate API Key</h1>
-            <p>Click the button below to generate a new API key.</p>
-            <form action="/generate-api-key" method="post">
-                <input type="hidden" name="authenticity_token" value="{}">
-                <button type="submit">Generate API Key</button>
-            </form>
-            <a href="/">Back to Home</a>
+            <div>
+                <h1>Generate API Key</h1>
+                <p>Click the button below to generate a new API key.</p>
+                <form action="/generate-api-key" method="post">
+                    <input type="hidden" name="authenticity_token" value="{}">
+                    <button type="submit">Generate API Key</button>
+                </form>
+                <a href="/">Back to Home</a>
+            </div>
         </body>
         </html>
         "#,
         authenticity_token
     );
 
-    // Return the token to ensure it gets added to response cookies
     Ok((token, Html(html)).into_response())
 }
 
-// Process the API key generation with CSRF validation
 async fn generate_api_key_post(
     token: CsrfToken,
     session: Session,
@@ -264,7 +257,6 @@ async fn generate_api_key_post(
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
-    // Get the stored authenticity token
     let stored_token: String = match session.get("authenticity_token").await? {
         Some(token) => token,
         None => {
@@ -274,22 +266,18 @@ async fn generate_api_key_post(
         }
     };
 
-    // Verify the token from form
     if token.verify(&form.authenticity_token).is_err() {
         return Err(AppError::from(anyhow::anyhow!("Invalid CSRF token")));
     }
 
-    // Verify the token from cookie against stored token
     if token.verify(&stored_token).is_err() {
         return Err(AppError::from(anyhow::anyhow!(
             "Token mismatch or replay attack detected"
         )));
     }
 
-    // Remove the token to prevent reuse
     session.remove::<String>("authenticity_token").await?;
 
-    // Generate the API key
     let api_key = apikeys::create_api_key(&state.db_pool, &email).await?;
 
     let html = format!(
