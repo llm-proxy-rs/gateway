@@ -1,0 +1,11 @@
+[package]
+name = "myhandlers"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.3"
+handlers = { git = "https://github.com/llm-proxy-rs/cognito.git", version = "0.1.0" }
+myerrors = { path = "../myerrors" }
+sqlx = { version = "0.8.3", features = ["postgres"] }
+tower-sessions = "0.14.0"

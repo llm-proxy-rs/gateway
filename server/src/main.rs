@@ -1,22 +1,23 @@
-use crate::error::AppError;
 use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::{Form, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response, sse::Sse},
     routing::{get, post},
 };
+use axum_csrf::{CsrfConfig, CsrfLayer, CsrfToken};
 use chat::{
     openai::OpenAIChatCompletionsProvider,
     providers::{BedrockChatCompletionsProvider, ChatCompletionsProvider},
 };
 use config::{Config, Environment, File};
 use dotenv::dotenv;
-use handlers::CallbackQuery;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{get_models, to_models_response};
+use myerrors::AppError;
+use myhandlers::{AppState, callback, login, logout};
 use request::ChatCompletionsRequest;
 use response::Usage;
 use serde::Deserialize;
@@ -31,20 +32,6 @@ use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{debug, error, info};
 use usage::{CreateUsageRequest, create_usage, get_usage_records};
 use users::create_user;
-
-mod error;
-
-#[derive(Clone)]
-struct AppState {
-    cognito_client_id: String,
-    cognito_client_secret: String,
-    cognito_domain: String,
-    cognito_redirect_uri: String,
-    cognito_region: String,
-    cognito_user_pool_id: String,
-    db_pool: Arc<PgPool>,
-    openai_api_key: Option<String>,
-}
 
 #[derive(Clone, Deserialize)]
 struct AppConfig {
@@ -188,6 +175,7 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
                         <p>Total spent: ${total_spent}</p>
                         <a href="/logout">Logout</a>
                         <a href="/generate-api-key">Generate API Key</a>
+                        <a href="/disable-api-keys">Disable API Keys</a>
                         <a href="/usage-history">View Usage History</a>
                         <a href="/browse-models">Browse Models</a>
                     </div>
@@ -216,44 +204,94 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
     Ok(Html(html).into_response())
 }
 
-async fn logout(session: Session) -> Result<Response, AppError> {
-    session.delete().await?;
-    Ok(Redirect::to("/").into_response())
+#[derive(Deserialize)]
+struct ApiKeyForm {
+    authenticity_token: String,
 }
 
-async fn login(session: Session, state: State<AppState>) -> Result<Response, AppError> {
-    let state = State(handlers::AppState {
-        client_id: state.cognito_client_id.clone(),
-        client_secret: state.cognito_client_secret.clone(),
-        domain: state.cognito_domain.clone(),
-        redirect_uri: state.cognito_redirect_uri.clone(),
-        region: state.cognito_region.clone(),
-        user_pool_id: state.cognito_user_pool_id.clone(),
-    });
-    Ok(handlers::login(session, state).await?)
+async fn verify_authenticity_token(
+    token: &CsrfToken,
+    session: &Session,
+    form_token: &str,
+) -> Result<(), AppError> {
+    let stored_token: String = match session.get("authenticity_token").await? {
+        Some(token) => token,
+        None => {
+            return Err(AppError::from(anyhow::anyhow!(
+                "CSRF token not found in session"
+            )));
+        }
+    };
+
+    if token.verify(form_token).is_err() {
+        return Err(AppError::from(anyhow::anyhow!("Invalid CSRF token")));
+    }
+
+    if token.verify(&stored_token).is_err() {
+        return Err(AppError::from(anyhow::anyhow!(
+            "Token mismatch or replay attack detected"
+        )));
+    }
+
+    session.remove::<String>("authenticity_token").await?;
+    Ok(())
 }
 
-async fn callback(
-    query: Query<CallbackQuery>,
+async fn get_authenticity_token(token: &CsrfToken, session: &Session) -> Result<String, AppError> {
+    let authenticity_token = token
+        .authenticity_token()
+        .map_err(|e| AppError::from(anyhow::anyhow!("Failed to generate CSRF token: {}", e)))?;
+
+    session
+        .insert("authenticity_token", &authenticity_token)
+        .await?;
+
+    Ok(authenticity_token)
+}
+
+async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>Generate API Key</h1>
+                <p>Click the button below to generate a new API key.</p>
+                <form action="/generate-api-key" method="post">
+                    <input type="hidden" name="authenticity_token" value="{}">
+                    <button type="submit">Generate API Key</button>
+                </form>
+                <a href="/">Back to Home</a>
+            </div>
+        </body>
+        </html>
+        "#,
+        authenticity_token
+    );
+
+    Ok((token, Html(html)).into_response())
+}
+
+async fn generate_api_key_post(
+    token: CsrfToken,
     session: Session,
     state: State<AppState>,
+    form: Form<ApiKeyForm>,
 ) -> Result<Response, AppError> {
-    let state = State(handlers::AppState {
-        client_id: state.cognito_client_id.clone(),
-        client_secret: state.cognito_client_secret.clone(),
-        domain: state.cognito_domain.clone(),
-        redirect_uri: state.cognito_redirect_uri.clone(),
-        region: state.cognito_region.clone(),
-        user_pool_id: state.cognito_user_pool_id.clone(),
-    });
-    Ok(handlers::callback(query, session, state).await?)
-}
-
-async fn generate_api_key(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
+
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
     let api_key = apikeys::create_api_key(&state.db_pool, &email).await?;
 
@@ -274,7 +312,7 @@ async fn generate_api_key(session: Session, state: State<AppState>) -> Result<Re
         api_key
     );
 
-    Ok(Html(html).into_response())
+    Ok((token, Html(html)).into_response())
 }
 
 async fn usage_history(session: Session, state: State<AppState>) -> Result<Response, AppError> {
@@ -356,6 +394,75 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
     );
 
     Ok(Html(html).into_response())
+}
+
+async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>Disable API Keys</h1>
+                <p>Click the button below to disable all your API keys.</p>
+                <p>Warning: This action cannot be undone.</p>
+                <form action="/disable-api-keys" method="post">
+                    <input type="hidden" name="authenticity_token" value="{}">
+                    <button type="submit">Disable API Keys</button>
+                </form>
+                <a href="/">Back to Home</a>
+            </div>
+        </body>
+        </html>
+        "#,
+        authenticity_token
+    );
+
+    Ok((token, Html(html)).into_response())
+}
+
+#[derive(Deserialize)]
+struct DisableApiKeysForm {
+    authenticity_token: String,
+}
+
+async fn disable_api_keys_post(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+    Form(form): Form<DisableApiKeysForm>,
+) -> Result<Response, AppError> {
+    let email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
+
+    let deleted_count = apikeys::disable_all_api_keys(&state.db_pool, &email).await?;
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <h1>API Keys Disabled</h1>
+            <p>{} API key(s) disabled.</p>
+            <a href="/">Back to Home</a>
+        </body>
+        </html>
+        "#,
+        deleted_count
+    );
+
+    Ok((token, Html(html)).into_response())
 }
 
 async fn browse_models(session: Session, state: State<AppState>) -> Result<Response, AppError> {
@@ -485,8 +592,8 @@ async fn select_exists_api_key_and_model_name(
 ) -> anyhow::Result<(bool, bool)> {
     let result: (bool, bool) = sqlx::query_as(
         r#"
-        SELECT 
-            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1),
+        SELECT
+            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE),
             EXISTS (SELECT 1 FROM models WHERE model_name = $2);
         "#,
     )
@@ -501,7 +608,7 @@ async fn select_exists_api_key_and_model_name(
 async fn select_exists_api_key(db_pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {
     let result: bool = sqlx::query_scalar(
         r#"
-        SELECT EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1)
+        SELECT EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE)
         "#,
     )
     .bind(api_key)
@@ -569,13 +676,21 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/browse-models", get(browse_models))
         .route("/callback", get(callback))
+        .route(
+            "/disable-api-keys",
+            get(disable_api_keys_get).post(disable_api_keys_post),
+        )
+        .route(
+            "/generate-api-key",
+            get(generate_api_key_get).post(generate_api_key_post),
+        )
         .route("/login", get(login))
         .route("/logout", get(logout))
-        .route("/generate-api-key", get(generate_api_key))
         .route("/usage-history", get(usage_history))
-        .route("/browse-models", get(browse_models))
         .merge(api)
+        .layer(CsrfLayer::new(CsrfConfig::default()))
         .layer(session_layer)
         .with_state(app_state);
 
