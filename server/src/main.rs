@@ -48,6 +48,7 @@ struct AppConfig {
     openai_api_key: Option<String>,
     #[serde(default = "default_port")]
     port: u16,
+    csrf_salt: String,
 }
 
 fn default_host() -> String {
@@ -690,7 +691,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/logout", get(logout))
         .route("/usage-history", get(usage_history))
         .merge(api)
-        .layer(CsrfLayer::new(CsrfConfig::default()))
+        .layer(CsrfLayer::new(
+            CsrfConfig::default().with_salt(app_config.csrf_salt),
+        ))
         .layer(session_layer)
         .with_state(app_state);
 
