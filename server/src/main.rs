@@ -7,7 +7,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response, sse::Sse},
     routing::{get, post},
 };
-use axum_csrf::{CsrfConfig, CsrfLayer, CsrfToken};
+use axum_csrf::{CsrfConfig, CsrfLayer, CsrfToken, Key};
 use chat::{
     openai::OpenAIChatCompletionsProvider,
     providers::{BedrockChatCompletionsProvider, ChatCompletionsProvider},
@@ -41,6 +41,8 @@ struct AppConfig {
     cognito_redirect_uri: String,
     cognito_region: String,
     cognito_user_pool_id: String,
+    csrf_cookie_key: String,
+    csrf_salt: String,
     #[serde(default = "default_database_url")]
     database_url: String,
     #[serde(default = "default_host")]
@@ -48,7 +50,6 @@ struct AppConfig {
     openai_api_key: Option<String>,
     #[serde(default = "default_port")]
     port: u16,
-    csrf_salt: String,
 }
 
 fn default_host() -> String {
@@ -675,6 +676,27 @@ async fn main() -> anyhow::Result<()> {
         .route("/models", get(models))
         .layer(cors_layer);
 
+    let mut csrf_config = CsrfConfig::default().with_salt(app_config.csrf_salt);
+
+    let key_bytes: Result<Vec<u8>, _> = app_config
+        .csrf_cookie_key
+        .split(", ")
+        .map(|s| s.trim().parse::<u8>())
+        .collect();
+
+    if let Ok(bytes) = key_bytes {
+        if bytes.len() == 64 {
+            csrf_config = csrf_config.with_key(Some(Key::from(&bytes)));
+        } else {
+            error!(
+                "CSRF cookie key must be exactly 64 bytes, got {}",
+                bytes.len()
+            );
+        }
+    } else {
+        error!("Failed to parse CSRF cookie key from config");
+    }
+
     let app = Router::new()
         .route("/", get(index))
         .route("/browse-models", get(browse_models))
@@ -691,9 +713,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/logout", get(logout))
         .route("/usage-history", get(usage_history))
         .merge(api)
-        .layer(CsrfLayer::new(
-            CsrfConfig::default().with_salt(app_config.csrf_salt),
-        ))
+        .layer(CsrfLayer::new(csrf_config))
         .layer(session_layer)
         .with_state(app_state);
 
