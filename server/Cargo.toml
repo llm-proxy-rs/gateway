@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 apikeys = { path = "../apikeys" }
 axum = "0.8.3"
 axum_csrf = { version = "0.11.0", features = ["layer"] }
@@ -19,9 +19,9 @@ request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = 
 reqwest = "0.12.15"
 response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 serde = "1.0.219"
-sqlx = { version = "0.8.3", features = ["postgres"] }
+sqlx = { version = "0.8.5", features = ["postgres"] }
 time = "0.3.41"
-tokio = { version = "1.44.1", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 tower-http = { version = "0.6.2", features = ["cors"] }
 tower-sessions = "0.14.0"
 tower-sessions-sqlx-store = { version = "0.15.0", features = ["postgres"] }
