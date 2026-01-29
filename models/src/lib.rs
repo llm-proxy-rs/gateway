@@ -50,6 +50,20 @@ pub async fn create_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()>
     Ok(())
 }
 
+pub async fn delete_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()> {
+    sqlx::query!(
+        r#"
+        DELETE FROM models
+        WHERE model_name = $1
+        "#,
+        model_name
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
 pub fn to_models_response(models: &[Model]) -> ModelsResponse {
     let data = models
         .iter()

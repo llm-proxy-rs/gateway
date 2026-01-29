@@ -19,7 +19,7 @@ use config::{Config, Environment, File};
 use dotenv::dotenv;
 use futures::Stream;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
-use models::{get_models, to_models_response};
+use models::{delete_model, get_models, to_models_response};
 use myerrors::AppError;
 use myhandlers::{AppState, callback, login, logout};
 use request::ChatCompletionsRequest;
@@ -519,11 +519,17 @@ async fn disable_api_keys_post(
     Ok((token, Html(html)).into_response())
 }
 
-async fn browse_models(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+async fn browse_models(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+) -> Result<Response, AppError> {
     let _email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
+
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
 
     let models = get_models(&state.db_pool).await?;
 
@@ -532,8 +538,15 @@ async fn browse_models(session: Session, state: State<AppState>) -> Result<Respo
         rows.push_str(&format!(
             r#"<tr>
                 <td>{}</td>
+                <td>
+                    <form action="/delete-model" method="post" style="margin: 0;">
+                        <input type="hidden" name="authenticity_token" value="{}">
+                        <input type="hidden" name="model_name" value="{}">
+                        <button type="submit" style="color: red;">Delete</button>
+                    </form>
+                </td>
             </tr>"#,
-            model.model_name
+            model.model_name, authenticity_token, model.model_name
         ));
     }
 
@@ -567,6 +580,7 @@ async fn browse_models(session: Session, state: State<AppState>) -> Result<Respo
                     <thead>
                         <tr>
                             <th>Model</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -580,7 +594,7 @@ async fn browse_models(session: Session, state: State<AppState>) -> Result<Respo
         "#
     );
 
-    Ok(Html(html).into_response())
+    Ok((token, Html(html)).into_response())
 }
 
 async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
@@ -672,6 +686,78 @@ async fn add_model_post(
                         <h1>Error</h1>
                         <p style="color: red;">{}</p>
                         <a href="/add-model">Try Again</a><br>
+                        <a href="/">Back to Home</a>
+                    </div>
+                </body>
+                </html>
+                "#,
+                error_message
+            );
+            Ok(Html(html).into_response())
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct DeleteModelForm {
+    authenticity_token: String,
+    model_name: String,
+}
+
+async fn delete_model_post(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+    form: Form<DeleteModelForm>,
+) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
+
+    match delete_model(&state.db_pool, &form.model_name).await {
+        Ok(_) => {
+            let html = format!(
+                r#"
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <div>
+                        <h1>Model Deleted</h1>
+                        <p>Model "{}" has been deleted successfully.</p>
+                        <a href="/browse-models">View Models</a><br>
+                        <a href="/">Back to Home</a>
+                    </div>
+                </body>
+                </html>
+                "#,
+                form.model_name
+            );
+            Ok(Html(html).into_response())
+        }
+        Err(e) => {
+            let error_message = if e.to_string().contains("foreign key constraint")
+                || e.to_string().contains("violates foreign key")
+            {
+                format!(
+                    "Cannot delete model \"{}\". It is still referenced by usage records.",
+                    form.model_name
+                )
+            } else {
+                format!("Failed to delete model: {}", e)
+            };
+
+            let html = format!(
+                r#"
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <div>
+                        <h1>Error</h1>
+                        <p style="color: red;">{}</p>
+                        <a href="/browse-models">View Models</a><br>
                         <a href="/">Back to Home</a>
                     </div>
                 </body>
@@ -845,6 +931,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/add-model", get(add_model_get).post(add_model_post))
         .route("/browse-models", get(browse_models))
         .route("/callback", get(callback))
+        .route("/delete-model", post(delete_model_post))
         .route(
             "/disable-api-keys",
             get(disable_api_keys_get).post(disable_api_keys_post),
