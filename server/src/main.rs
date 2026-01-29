@@ -542,7 +542,7 @@ async fn browse_models(
                     <form action="/delete-model" method="post" style="margin: 0;">
                         <input type="hidden" name="authenticity_token" value="{}">
                         <input type="hidden" name="model_name" value="{}">
-                        <button type="submit" style="color: red;">Delete</button>
+                        <button type="submit">Delete</button>
                     </form>
                 </td>
             </tr>"#,
