@@ -427,7 +427,10 @@ async fn generate_api_key_post(
     Ok((token, Html(html)).into_response())
 }
 
-async fn view_usage_history(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+async fn view_usage_history(
+    session: Session,
+    state: State<AppState>,
+) -> Result<Response, AppError> {
     let email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
@@ -469,7 +472,7 @@ async fn view_usage_history(session: Session, state: State<AppState>) -> Result<
         </head>
         <body>
             <div>
-                <h1>View Usage History</h1>
+                <h1>View Last 100 Usage Records for {email}</h1>
                 <table>
                     <thead>
                         <tr>
