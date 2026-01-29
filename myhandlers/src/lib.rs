@@ -20,7 +20,7 @@ pub struct AppState {
 }
 
 pub async fn logout(session: Session) -> Result<Response, AppError> {
-    session.delete().await?;
+    session.remove::<String>("email").await?;
     Ok(Redirect::to("/").into_response())
 }
 
