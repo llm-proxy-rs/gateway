@@ -83,7 +83,7 @@ fn make_usage_tracker(
         };
 
         tokio::spawn(async move {
-            if let Err(e) = create_usage(&*db_pool, create_usage_request).await {
+            if let Err(e) = create_usage(&db_pool, create_usage_request).await {
                 error!("Failed to create usage: {}", e);
             }
         });
@@ -580,7 +580,7 @@ async fn browse_models(
                     <thead>
                         <tr>
                             <th>Model</th>
-                            <th>Actions</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
