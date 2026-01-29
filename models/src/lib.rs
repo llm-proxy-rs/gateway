@@ -27,6 +27,7 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
         SELECT
             model_name
         FROM models
+        ORDER BY model_name
         "#
     )
     .fetch_all(pool)
