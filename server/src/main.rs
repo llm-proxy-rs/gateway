@@ -1,5 +1,7 @@
+use anthropic_request::V1MessagesRequest;
 use anyhow::Context;
 use apikeys::get_api_key;
+use aws_sdk_bedrockruntime::types::TokenUsage;
 use axum::{
     Json, Router,
     extract::{Form, State},
@@ -8,18 +10,19 @@ use axum::{
     routing::{get, post},
 };
 use axum_csrf::{CsrfConfig, CsrfLayer, CsrfToken, Key};
-use chat::{
-    openai::OpenAIChatCompletionsProvider,
-    providers::{BedrockChatCompletionsProvider, ChatCompletionsProvider},
+use chat::bedrock::ReasoningEffortToThinkingBudgetTokens;
+use chat::provider::{
+    BedrockChatCompletionsProvider, BedrockV1MessagesProvider, ChatCompletionsProvider,
+    V1MessagesProvider,
 };
 use config::{Config, Environment, File};
 use dotenv::dotenv;
+use futures::Stream;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{get_models, to_models_response};
 use myerrors::AppError;
 use myhandlers::{AppState, callback, login, logout};
 use request::ChatCompletionsRequest;
-use response::Usage;
 use serde::Deserialize;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -47,7 +50,6 @@ struct AppConfig {
     database_url: String,
     #[serde(default = "default_host")]
     host: String,
-    openai_api_key: Option<String>,
     #[serde(default = "default_port")]
     port: u16,
 }
@@ -62,6 +64,30 @@ fn default_port() -> u16 {
 
 fn default_database_url() -> String {
     "postgres://postgres:postgres@localhost/gateway".to_string()
+}
+
+fn make_usage_tracker(
+    db_pool: Arc<PgPool>,
+    api_key: String,
+    model_name: String,
+) -> impl Fn(&TokenUsage) + Send + Sync + 'static {
+    move |usage: &TokenUsage| {
+        info!("Usage: {:?}", usage);
+
+        let db_pool = db_pool.clone();
+        let create_usage_request = CreateUsageRequest {
+            api_key: api_key.clone(),
+            model_name: model_name.clone(),
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+        };
+
+        tokio::spawn(async move {
+            if let Err(e) = create_usage(&*db_pool, create_usage_request).await {
+                error!("Failed to create usage: {}", e);
+            }
+        });
+    }
 }
 
 async fn chat_completions(
@@ -104,56 +130,80 @@ async fn chat_completions(
 
     payload.model = payload.model.to_lowercase();
 
-    let model_name = payload.model.clone();
+    let usage_callback = make_usage_tracker(
+        state.db_pool.clone(),
+        api_key.clone(),
+        payload.model.clone(),
+    );
 
-    let usage_callback = move |usage: &Usage| {
-        info!(
-            "Usage: prompt_tokens: {}, completion_tokens: {}, total_tokens: {}",
-            usage.prompt_tokens, usage.completion_tokens, usage.total_tokens
-        );
+    let reasoning_effort_to_thinking_budget_tokens =
+        ReasoningEffortToThinkingBudgetTokens::default();
 
-        let db_pool = state.db_pool.clone();
-        let create_usage_request = CreateUsageRequest {
-            api_key: api_key.clone(),
-            model_name: model_name.clone(),
-            input_tokens: usage.prompt_tokens,
-            output_tokens: usage.completion_tokens,
-        };
+    let stream = BedrockChatCompletionsProvider::new()
+        .await
+        .chat_completions_stream(
+            payload,
+            reasoning_effort_to_thinking_budget_tokens,
+            usage_callback,
+        )
+        .await?;
 
-        tokio::spawn(async move {
-            if let Err(e) = create_usage(&db_pool, create_usage_request).await {
-                error!("Failed to create usage: {}", e);
-            }
-        });
-    };
+    Ok((StatusCode::OK, Sse::new(stream)))
+}
 
-    let stream = if payload.model.starts_with("openai/") {
-        payload.model = payload.model.replace("openai/", "");
-        info!("Using OpenAI provider for model: {}", payload.model);
-        if let Some(openai_api_key) = &state.openai_api_key {
-            if openai_api_key.is_empty() {
-                error!("OpenAI API key is empty but OpenAI model was requested");
-                return Err(AppError::from(anyhow::anyhow!(
-                    "OpenAI API key is empty but OpenAI model was requested"
-                )));
-            }
-            OpenAIChatCompletionsProvider::new(openai_api_key)
-                .chat_completions_stream(payload, usage_callback)
-                .await?
-        } else {
-            error!("OpenAI API key is not configured but OpenAI model was requested");
-            return Err(AppError::from(anyhow::anyhow!(
-                "OpenAI API key is not configured but OpenAI model was requested"
-            )));
-        }
-    } else {
-        payload.model = payload.model.replace("bedrock/", "");
-        info!("Using Bedrock provider for model: {}", payload.model);
-        BedrockChatCompletionsProvider::new()
-            .await
-            .chat_completions_stream(payload, usage_callback)
-            .await?
-    };
+async fn v1_messages(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(mut payload): Json<V1MessagesRequest>,
+) -> Result<
+    (
+        StatusCode,
+        Sse<impl Stream<Item = Result<axum::response::sse::Event, anyhow::Error>>>,
+    ),
+    AppError,
+> {
+    debug!("Received v1/messages request for model: {}", payload.model);
+
+    let api_key = get_api_key(&headers)
+        .await
+        .context("Missing API key in Authorization header")?;
+
+    let (api_key_exists, model_name_exists) =
+        select_exists_api_key_and_model_name(&state.db_pool, &api_key, &payload.model).await?;
+
+    if !api_key_exists {
+        error!("API key validation failed: Invalid API key");
+        return Err(AppError::from(anyhow::anyhow!(
+            "Invalid or missing API key"
+        )));
+    }
+
+    if !model_name_exists {
+        error!("Model name validation failed: Invalid model name");
+        return Err(AppError::from(anyhow::anyhow!(
+            "Invalid or missing model name"
+        )));
+    }
+
+    if payload.stream != Some(true) {
+        error!("Streaming is required but was disabled");
+        return Err(AppError::from(anyhow::anyhow!(
+            "Streaming is required but was disabled"
+        )));
+    }
+
+    payload.model = payload.model.to_lowercase();
+
+    let usage_callback = make_usage_tracker(
+        state.db_pool.clone(),
+        api_key.clone(),
+        payload.model.clone(),
+    );
+
+    let stream = BedrockV1MessagesProvider::new()
+        .await
+        .v1_messages_stream(payload, usage_callback)
+        .await?;
 
     Ok((StatusCode::OK, Sse::new(stream)))
 }
@@ -163,9 +213,12 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
 
     let html = match email {
         Some(ref email) => {
-            let total_spent = users::get_total_spent(&state.db_pool, email)
+            let stats = users::get_usage_stats(&state.db_pool, email)
                 .await
-                .unwrap_or_default();
+                .unwrap_or(users::UsageStats {
+                    usage_count: 0,
+                    total_tokens: 0,
+                });
 
             format!(
                 r#"
@@ -174,16 +227,18 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
                 <body>
                     <div>
                         <h1>Welcome, {email}!</h1>
-                        <p>Total spent: ${total_spent}</p>
+                        <p>Total usage: {} requests ({} tokens)</p>
                         <a href="/logout">Logout</a>
                         <a href="/generate-api-key">Generate API Key</a>
                         <a href="/disable-api-keys">Disable API Keys</a>
                         <a href="/usage-history">View Usage History</a>
                         <a href="/browse-models">Browse Models</a>
+                        <a href="/add-model">Add Model</a>
                     </div>
                 </body>
                 </html>
-                "#
+                "#,
+                stats.usage_count, stats.total_tokens
             )
         }
         None => r#"
@@ -327,21 +382,19 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
 
     let mut rows = String::new();
     for record in usage_records {
-        let total_tokens = record.total_input_tokens + record.total_output_tokens;
+        let total_tokens = record.total_tokens();
 
         rows.push_str(&format!(
             r#"<tr>
                 <td>{}</td>
                 <td>{}</td>
                 <td>{}</td>
-                <td>${}</td>
                 <td>{}</td>
                 <td>{}</td>
             </tr>"#,
             record.model_name,
             total_tokens,
             record.created_at,
-            record.total_cost(),
             record.total_input_tokens,
             record.total_output_tokens
         ));
@@ -379,7 +432,6 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
                             <th>Model</th>
                             <th>Total Tokens</th>
                             <th>Date</th>
-                            <th>Cost</th>
                             <th>Input Tokens</th>
                             <th>Output Tokens</th>
                         </tr>
@@ -480,10 +532,8 @@ async fn browse_models(session: Session, state: State<AppState>) -> Result<Respo
         rows.push_str(&format!(
             r#"<tr>
                 <td>{}</td>
-                <td>${}</td>
-                <td>${}</td>
             </tr>"#,
-            model.model_name, model.input_price_per_token, model.output_price_per_token
+            model.model_name
         ));
     }
 
@@ -517,8 +567,6 @@ async fn browse_models(session: Session, state: State<AppState>) -> Result<Respo
                     <thead>
                         <tr>
                             <th>Model</th>
-                            <th>Input Price Per Token</th>
-                            <th>Output Price Per Token</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -533,6 +581,107 @@ async fn browse_models(session: Session, state: State<AppState>) -> Result<Respo
     );
 
     Ok(Html(html).into_response())
+}
+
+async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>Add Model</h1>
+                <form action="/add-model" method="post">
+                    <input type="hidden" name="authenticity_token" value="{}">
+                    <label for="model_name">Model Name:</label><br>
+                    <input type="text" id="model_name" name="model_name" required style="width: 400px;"><br><br>
+                    <button type="submit">Add Model</button>
+                </form>
+                <a href="/">Back to Home</a>
+            </div>
+        </body>
+        </html>
+        "#,
+        authenticity_token
+    );
+
+    Ok((token, Html(html)).into_response())
+}
+
+#[derive(Deserialize)]
+struct AddModelForm {
+    authenticity_token: String,
+    model_name: String,
+}
+
+async fn add_model_post(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+    form: Form<AddModelForm>,
+) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
+
+    match models::create_model(&state.db_pool, &form.model_name).await {
+        Ok(_) => {
+            let html = format!(
+                r#"
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <div>
+                        <h1>Model Added</h1>
+                        <p>Model "{}" has been added successfully.</p>
+                        <a href="/browse-models">View Models</a><br>
+                        <a href="/">Back to Home</a>
+                    </div>
+                </body>
+                </html>
+                "#,
+                form.model_name
+            );
+            Ok(Html(html).into_response())
+        }
+        Err(e) => {
+            let error_message = if e.to_string().contains("duplicate key")
+                || e.to_string().contains("unique constraint")
+            {
+                format!("Model \"{}\" already exists.", form.model_name)
+            } else {
+                format!("Failed to add model: {}", e)
+            };
+
+            let html = format!(
+                r#"
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <div>
+                        <h1>Error</h1>
+                        <p style="color: red;">{}</p>
+                        <a href="/add-model">Try Again</a><br>
+                        <a href="/">Back to Home</a>
+                    </div>
+                </body>
+                </html>
+                "#,
+                error_message
+            );
+            Ok(Html(html).into_response())
+        }
+    }
 }
 
 async fn models(
@@ -564,12 +713,6 @@ async fn load_config() -> anyhow::Result<AppConfig> {
         .add_source(Environment::default())
         .build()?
         .try_deserialize()?;
-
-    if app_config.openai_api_key.is_some() {
-        info!("OpenAI API key found in configuration");
-    } else {
-        info!("No OpenAI API key found in configuration, OpenAI models will not be available");
-    }
 
     Ok(app_config)
 }
@@ -651,7 +794,6 @@ async fn main() -> anyhow::Result<()> {
         cognito_region: app_config.cognito_region,
         cognito_user_pool_id: app_config.cognito_user_pool_id,
         db_pool: Arc::new(db_pool.clone()),
-        openai_api_key: app_config.openai_api_key,
     };
 
     let session_store = PostgresStore::new(db_pool);
@@ -673,6 +815,7 @@ async fn main() -> anyhow::Result<()> {
 
     let api = Router::new()
         .route("/chat/completions", post(chat_completions))
+        .route("/v1/messages", post(v1_messages))
         .route("/models", get(models))
         .layer(cors_layer);
 
@@ -699,6 +842,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/add-model", get(add_model_get).post(add_model_post))
         .route("/browse-models", get(browse_models))
         .route("/callback", get(callback))
         .route(

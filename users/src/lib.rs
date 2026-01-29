@@ -1,6 +1,11 @@
 use anyhow::Context;
 use sqlx::PgPool;
 
+pub struct UsageStats {
+    pub usage_count: i64,
+    pub total_tokens: i64,
+}
+
 pub async fn create_user(pool: &PgPool, email: &str) -> anyhow::Result<()> {
     sqlx::query("INSERT INTO users (email) VALUES ($1)")
         .bind(email)
@@ -9,29 +14,27 @@ pub async fn create_user(pool: &PgPool, email: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn get_total_spent(pool: &PgPool, email: &str) -> anyhow::Result<f64> {
+pub async fn get_usage_stats(pool: &PgPool, email: &str) -> anyhow::Result<UsageStats> {
     let result = sqlx::query!(
         r#"
-        WITH updated_user AS (
-            UPDATE users
-            SET
-                total_spent = 0,
-                updated_at = now()
-            WHERE
-                email = $1
-                AND date_trunc('month', updated_at) <> date_trunc('month', now())
-            RETURNING total_spent
-        )
         SELECT
-            COALESCE(
-                (SELECT total_spent FROM updated_user),
-                (SELECT total_spent FROM users WHERE email = $1 LIMIT 1)
-            ) as total_spent
+            COUNT(*) as usage_count,
+            COALESCE(SUM(total_input_tokens + total_output_tokens), 0)::bigint as total_tokens
+        FROM
+            usage u
+        JOIN
+            users usr ON u.user_id = usr.user_id
+        WHERE
+            usr.email = $1
+            AND date_trunc('month', u.created_at) = date_trunc('month', now())
         "#,
         email
     )
     .fetch_one(pool)
     .await?;
 
-    result.total_spent.context("total_spent is null")
+    Ok(UsageStats {
+        usage_count: result.usage_count.context("usage_count is null")?,
+        total_tokens: result.total_tokens.context("total_tokens is null")?,
+    })
 }

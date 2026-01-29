@@ -4,8 +4,6 @@ use sqlx::PgPool;
 #[derive(Deserialize)]
 pub struct Model {
     pub model_name: String,
-    pub input_price_per_token: f64,
-    pub output_price_per_token: f64,
 }
 
 #[derive(Serialize)]
@@ -27,9 +25,7 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
         Model,
         r#"
         SELECT
-            model_name,
-            input_price_per_token::float8,
-            output_price_per_token::float8
+            model_name
         FROM models
         "#
     )
@@ -37,6 +33,20 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
     .await?;
 
     Ok(models)
+}
+
+pub async fn create_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()> {
+    sqlx::query!(
+        r#"
+        INSERT INTO models (model_name)
+        VALUES ($1)
+        "#,
+        model_name
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 pub fn to_models_response(models: &[Model]) -> ModelsResponse {

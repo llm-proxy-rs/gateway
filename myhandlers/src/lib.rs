@@ -17,7 +17,6 @@ pub struct AppState {
     pub cognito_region: String,
     pub cognito_user_pool_id: String,
     pub db_pool: Arc<PgPool>,
-    pub openai_api_key: Option<String>,
 }
 
 pub async fn logout(session: Session) -> Result<Response, AppError> {
