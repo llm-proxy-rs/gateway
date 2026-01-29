@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET usage_record = NOT usage_record WHERE email = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9afaf27fa18e3ac25bec7e64f651cfb3d664222a2e5381bb9ff139430cb22aa0"
+}

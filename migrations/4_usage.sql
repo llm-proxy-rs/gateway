@@ -5,8 +5,7 @@ create table if not exists usage (
     constraint fk_user_id foreign key (user_id) references users(user_id),
     created_at timestamptz not null default now(),
     model_id uuid not null,
-    total_input_tokens bigint not null,
-    total_output_tokens bigint not null,
+    total_tokens bigint not null,
     updated_at timestamptz not null default now(),
     usage_id uuid primary key default uuid_generate_v4(),
     user_id uuid not null

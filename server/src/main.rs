@@ -66,6 +66,20 @@ fn default_database_url() -> String {
     "postgres://postgres:postgres@localhost/gateway".to_string()
 }
 
+fn nav_menu() -> &'static str {
+    r#"<br>
+        <a href="/">Home</a>
+        <a href="/generate-api-key">Generate API Key</a>
+        <a href="/disable-api-keys">Disable API Keys</a>
+        <a href="/view-usage-history">View Usage History</a>
+        <a href="/update-usage-recording">Update Usage Recording</a>
+        <a href="/clear-usage-history">Clear Usage History</a>
+        <a href="/browse-models">Browse Models</a>
+        <a href="/add-model">Add Model</a>
+        <a href="/logout">Logout</a>
+    "#
+}
+
 fn make_usage_tracker(
     db_pool: Arc<PgPool>,
     api_key: String,
@@ -75,11 +89,11 @@ fn make_usage_tracker(
         info!("Usage: {:?}", usage);
 
         let db_pool = db_pool.clone();
+
         let create_usage_request = CreateUsageRequest {
             api_key: api_key.clone(),
             model_name: model_name.clone(),
-            input_tokens: usage.input_tokens,
-            output_tokens: usage.output_tokens,
+            total_tokens: usage.total_tokens,
         };
 
         tokio::spawn(async move {
@@ -220,25 +234,64 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
                     total_tokens: 0,
                 });
 
+            let (total_keys, active_keys) = sqlx::query!(
+                r#"
+                SELECT
+                    COUNT(*) as "total!",
+                    COUNT(*) FILTER (WHERE is_disabled = false) as "active!"
+                FROM api_keys
+                WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
+                "#,
+                email
+            )
+            .fetch_one(state.db_pool.as_ref())
+            .await
+            .map(|row| (row.total, row.active))
+            .unwrap_or((0, 0));
+
             format!(
                 r#"
                 <!DOCTYPE html>
                 <html>
+                <head>
+                    <style>
+                        table {{
+                            border-collapse: collapse;
+                            margin: 20px 0 0 0;
+                        }}
+                        th, td {{
+                            border: 1px solid #ddd;
+                            padding: 8px;
+                            text-align: left;
+                        }}
+                        th {{
+                            background-color: #f2f2f2;
+                        }}
+                    </style>
+                </head>
                 <body>
                     <div>
                         <h1>Welcome, {email}!</h1>
-                        <p>Total usage: {} requests ({} tokens)</p>
-                        <a href="/logout">Logout</a>
-                        <a href="/generate-api-key">Generate API Key</a>
-                        <a href="/disable-api-keys">Disable API Keys</a>
-                        <a href="/usage-history">View Usage History</a>
-                        <a href="/browse-models">Browse Models</a>
-                        <a href="/add-model">Add Model</a>
+                        <table>
+                            <tr>
+                                <th>Total usage</th>
+                                <td>{} requests ({} tokens)</td>
+                            </tr>
+                            <tr>
+                                <th>API keys</th>
+                                <td>{} active ({} total)</td>
+                            </tr>
+                        </table>
+                        {}
                     </div>
                 </body>
                 </html>
                 "#,
-                stats.usage_count, stats.total_tokens
+                stats.usage_count,
+                stats.total_tokens,
+                active_keys,
+                total_keys,
+                nav_menu()
             )
         }
         None => r#"
@@ -326,12 +379,13 @@ async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Resp
                     <input type="hidden" name="authenticity_token" value="{}">
                     <button type="submit">Generate API Key</button>
                 </form>
-                <a href="/">Back to Home</a>
+                {}
             </div>
         </body>
         </html>
         "#,
-        authenticity_token
+        authenticity_token,
+        nav_menu()
     );
 
     Ok((token, Html(html)).into_response())
@@ -361,18 +415,19 @@ async fn generate_api_key_post(
                 <h1>Your API Key</h1>
                 <p>Please save this key securely. It will not be shown again.</p>
                 <pre>{}</pre>
-                <a href="/">Back to Home</a>
+                {}
             </div>
         </body>
         </html>
         "#,
-        api_key
+        api_key,
+        nav_menu()
     );
 
     Ok((token, Html(html)).into_response())
 }
 
-async fn usage_history(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+async fn view_usage_history(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let email = match session.get::<String>("email").await? {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
@@ -382,21 +437,13 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
 
     let mut rows = String::new();
     for record in usage_records {
-        let total_tokens = record.total_tokens();
-
         rows.push_str(&format!(
             r#"<tr>
                 <td>{}</td>
                 <td>{}</td>
                 <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
             </tr>"#,
-            record.model_name,
-            total_tokens,
-            record.created_at,
-            record.total_input_tokens,
-            record.total_output_tokens
+            record.model_name, record.total_tokens, record.created_at
         ));
     }
 
@@ -409,7 +456,7 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
                 table {{
                     border-collapse: collapse;
                     width: 100%;
-                    margin: 20px 0;
+                    margin: 20px 0 0 0;
                 }}
                 th, td {{
                     border: 1px solid #ddd;
@@ -418,33 +465,29 @@ async fn usage_history(session: Session, state: State<AppState>) -> Result<Respo
                 th {{
                     background-color: #f2f2f2;
                 }}
-                tr:nth-child(even) {{
-                    background-color: #f9f9f9;
-                }}
             </style>
         </head>
         <body>
             <div>
-                <h1>Last 100 Usage Records for {email}</h1>
+                <h1>View Usage History</h1>
                 <table>
                     <thead>
                         <tr>
                             <th>Model</th>
                             <th>Total Tokens</th>
                             <th>Date</th>
-                            <th>Input Tokens</th>
-                            <th>Output Tokens</th>
                         </tr>
                     </thead>
                     <tbody>
                         {rows}
                     </tbody>
                 </table>
-                <a href="/">Back to Home</a>
+                {}
             </div>
         </body>
         </html>
-        "#
+        "#,
+        nav_menu()
     );
 
     Ok(Html(html).into_response())
@@ -471,12 +514,13 @@ async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Resp
                     <input type="hidden" name="authenticity_token" value="{}">
                     <button type="submit">Disable API Keys</button>
                 </form>
-                <a href="/">Back to Home</a>
+                {}
             </div>
         </body>
         </html>
         "#,
-        authenticity_token
+        authenticity_token,
+        nav_menu()
     );
 
     Ok((token, Html(html)).into_response())
@@ -519,6 +563,163 @@ async fn disable_api_keys_post(
     Ok((token, Html(html)).into_response())
 }
 
+async fn update_usage_recording_get(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+) -> Result<Response, AppError> {
+    let email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
+
+    let usage_record =
+        sqlx::query_scalar!("SELECT usage_record FROM users WHERE email = $1", email)
+            .fetch_one(state.db_pool.as_ref())
+            .await?;
+
+    let status = if usage_record { "enabled" } else { "disabled" };
+    let action = if usage_record { "Disable" } else { "Enable" };
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>Update Usage Recording</h1>
+                <p>Usage recording is currently <strong>{}</strong>.</p>
+                <form action="/update-usage-recording" method="post">
+                    <input type="hidden" name="authenticity_token" value="{}">
+                    <button type="submit">{} Usage Recording</button>
+                </form>
+                {}
+            </div>
+        </body>
+        </html>
+        "#,
+        status,
+        authenticity_token,
+        action,
+        nav_menu()
+    );
+
+    Ok((token, Html(html)).into_response())
+}
+
+#[derive(Deserialize)]
+struct UsageRecordingForm {
+    authenticity_token: String,
+}
+
+async fn update_usage_recording_post(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+    form: Form<UsageRecordingForm>,
+) -> Result<Response, AppError> {
+    let email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
+
+    sqlx::query!(
+        "UPDATE users SET usage_record = NOT usage_record WHERE email = $1",
+        email
+    )
+    .execute(state.db_pool.as_ref())
+    .await?;
+
+    Ok(Redirect::to("/update-usage-recording").into_response())
+}
+
+async fn clear_usage_history_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
+    let _email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    let authenticity_token = get_authenticity_token(&token, &session).await?;
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>Clear Usage History</h1>
+                <p>Click the button below to delete all your usage history records.</p>
+                <p>Warning: This action cannot be undone.</p>
+                <form action="/clear-usage-history" method="post">
+                    <input type="hidden" name="authenticity_token" value="{}">
+                    <button type="submit">Clear Usage History</button>
+                </form>
+                {}
+            </div>
+        </body>
+        </html>
+        "#,
+        authenticity_token,
+        nav_menu()
+    );
+
+    Ok((token, Html(html)).into_response())
+}
+
+#[derive(Deserialize)]
+struct ClearUsageHistoryForm {
+    authenticity_token: String,
+}
+
+async fn clear_usage_history_post(
+    token: CsrfToken,
+    session: Session,
+    state: State<AppState>,
+    form: Form<ClearUsageHistoryForm>,
+) -> Result<Response, AppError> {
+    let email = match session.get::<String>("email").await? {
+        Some(email) => email,
+        None => return Ok(Redirect::to("/login").into_response()),
+    };
+
+    verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
+
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM usage
+        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
+        "#,
+        email
+    )
+    .execute(state.db_pool.as_ref())
+    .await?;
+
+    let deleted_count = result.rows_affected();
+
+    let html = format!(
+        r#"
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <div>
+                <h1>Usage History Cleared</h1>
+                <p>{} usage record(s) deleted.</p>
+                {}
+            </div>
+        </body>
+        </html>
+        "#,
+        deleted_count,
+        nav_menu()
+    );
+
+    Ok((token, Html(html)).into_response())
+}
+
 async fn browse_models(
     token: CsrfToken,
     session: Session,
@@ -535,18 +736,27 @@ async fn browse_models(
 
     let mut rows = String::new();
     for model in models {
-        rows.push_str(&format!(
-            r#"<tr>
-                <td>{}</td>
-                <td>
+        let action_cell = if model.protected {
+            "<td></td>".to_string()
+        } else {
+            format!(
+                r#"<td>
                     <form action="/delete-model" method="post" style="margin: 0;">
                         <input type="hidden" name="authenticity_token" value="{}">
                         <input type="hidden" name="model_name" value="{}">
                         <button type="submit">Delete</button>
                     </form>
-                </td>
+                </td>"#,
+                authenticity_token, model.model_name
+            )
+        };
+
+        rows.push_str(&format!(
+            r#"<tr>
+                <td>{}</td>
+                {}
             </tr>"#,
-            model.model_name, authenticity_token, model.model_name
+            model.model_name, action_cell
         ));
     }
 
@@ -559,7 +769,7 @@ async fn browse_models(
                 table {{
                     border-collapse: collapse;
                     width: 100%;
-                    margin: 20px 0;
+                    margin: 20px 0 0 0;
                 }}
                 th, td {{
                     border: 1px solid #ddd;
@@ -568,14 +778,11 @@ async fn browse_models(
                 th {{
                     background-color: #f2f2f2;
                 }}
-                tr:nth-child(even) {{
-                    background-color: #f9f9f9;
-                }}
             </style>
         </head>
         <body>
             <div>
-                <h1>Available Models</h1>
+                <h1>Browse Models</h1>
                 <table>
                     <thead>
                         <tr>
@@ -587,11 +794,12 @@ async fn browse_models(
                         {rows}
                     </tbody>
                 </table>
-                <a href="/">Back to Home</a>
+                {}
             </div>
         </body>
         </html>
-        "#
+        "#,
+        nav_menu()
     );
 
     Ok((token, Html(html)).into_response())
@@ -618,12 +826,13 @@ async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, A
                     <input type="text" id="model_name" name="model_name" required style="width: 400px;"><br><br>
                     <button type="submit">Add Model</button>
                 </form>
-                <a href="/">Back to Home</a>
+                {}
             </div>
         </body>
         </html>
         "#,
-        authenticity_token
+        authenticity_token,
+        nav_menu()
     );
 
     Ok((token, Html(html)).into_response())
@@ -658,13 +867,13 @@ async fn add_model_post(
                     <div>
                         <h1>Model Added</h1>
                         <p>Model "{}" has been added successfully.</p>
-                        <a href="/browse-models">View Models</a><br>
-                        <a href="/">Back to Home</a>
+                        {}
                     </div>
                 </body>
                 </html>
                 "#,
-                form.model_name
+                form.model_name,
+                nav_menu()
             );
             Ok(Html(html).into_response())
         }
@@ -685,13 +894,13 @@ async fn add_model_post(
                     <div>
                         <h1>Error</h1>
                         <p style="color: red;">{}</p>
-                        <a href="/add-model">Try Again</a><br>
-                        <a href="/">Back to Home</a>
+                        {}
                     </div>
                 </body>
                 </html>
                 "#,
-                error_message
+                error_message,
+                nav_menu()
             );
             Ok(Html(html).into_response())
         }
@@ -727,13 +936,13 @@ async fn delete_model_post(
                     <div>
                         <h1>Model Deleted</h1>
                         <p>Model "{}" has been deleted successfully.</p>
-                        <a href="/browse-models">View Models</a><br>
-                        <a href="/">Back to Home</a>
+                        {}
                     </div>
                 </body>
                 </html>
                 "#,
-                form.model_name
+                form.model_name,
+                nav_menu()
             );
             Ok(Html(html).into_response())
         }
@@ -757,13 +966,13 @@ async fn delete_model_post(
                     <div>
                         <h1>Error</h1>
                         <p style="color: red;">{}</p>
-                        <a href="/browse-models">View Models</a><br>
-                        <a href="/">Back to Home</a>
+                        {}
                     </div>
                 </body>
                 </html>
                 "#,
-                error_message
+                error_message,
+                nav_menu()
             );
             Ok(Html(html).into_response())
         }
@@ -942,7 +1151,15 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/login", get(login))
         .route("/logout", get(logout))
-        .route("/usage-history", get(usage_history))
+        .route("/view-usage-history", get(view_usage_history))
+        .route(
+            "/update-usage-recording",
+            get(update_usage_recording_get).post(update_usage_recording_post),
+        )
+        .route(
+            "/clear-usage-history",
+            get(clear_usage_history_get).post(clear_usage_history_post),
+        )
         .merge(api)
         .layer(CsrfLayer::new(csrf_config))
         .layer(session_layer)

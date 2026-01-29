@@ -8,23 +8,15 @@ use time::format_description::well_known::Rfc3339;
 #[derive(Serialize)]
 pub struct Usage {
     pub model_name: String,
-    pub total_input_tokens: i64,
-    pub total_output_tokens: i64,
+    pub total_tokens: i64,
     #[serde_as(as = "Rfc3339")]
     pub created_at: OffsetDateTime,
-}
-
-impl Usage {
-    pub fn total_tokens(&self) -> i64 {
-        self.total_input_tokens + self.total_output_tokens
-    }
 }
 
 pub struct CreateUsageRequest {
     pub api_key: String,
     pub model_name: String,
-    pub input_tokens: i32,
-    pub output_tokens: i32,
+    pub total_tokens: i32,
 }
 
 pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Result<()> {
@@ -32,27 +24,29 @@ pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Re
         r#"
         INSERT INTO usage (
             api_key_id, model_id, user_id,
-            total_input_tokens, total_output_tokens
+            total_tokens
         )
         SELECT
             ak.api_key_id, m.model_id, ak.user_id,
-            $3, $4
+            $3
         FROM
             (
                 SELECT api_key_id, user_id
                 FROM api_keys
                 WHERE api_key = $1
-            ) ak,
+            ) ak
+        JOIN
             (
                 SELECT model_id
                 FROM models
                 WHERE model_name = $2
-            ) m
+            ) m ON true
+        JOIN
+            users u ON u.user_id = ak.user_id AND u.usage_record = true
         "#,
         create_usage.api_key,
         create_usage.model_name,
-        create_usage.input_tokens as i64,
-        create_usage.output_tokens as i64
+        create_usage.total_tokens as i64
     )
     .execute(pool)
     .await?;
@@ -66,8 +60,7 @@ pub async fn get_usage_records(pool: &PgPool, email: &str, limit: i64) -> Result
         r#"
         SELECT
             m.model_name,
-            u.total_input_tokens,
-            u.total_output_tokens,
+            u.total_tokens,
             u.created_at
         FROM
             usage u

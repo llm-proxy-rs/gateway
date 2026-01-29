@@ -4,6 +4,7 @@ use sqlx::PgPool;
 #[derive(Deserialize)]
 pub struct Model {
     pub model_name: String,
+    pub protected: bool,
 }
 
 #[derive(Serialize)]
@@ -25,7 +26,8 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
         Model,
         r#"
         SELECT
-            model_name
+            model_name,
+            protected
         FROM models
         ORDER BY model_name
         "#
@@ -54,7 +56,7 @@ pub async fn delete_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()>
     sqlx::query!(
         r#"
         DELETE FROM models
-        WHERE model_name = $1
+        WHERE model_name = $1 AND protected = false
         "#,
         model_name
     )

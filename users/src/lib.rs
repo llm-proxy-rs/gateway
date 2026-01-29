@@ -19,7 +19,7 @@ pub async fn get_usage_stats(pool: &PgPool, email: &str) -> anyhow::Result<Usage
         r#"
         SELECT
             COUNT(*) as usage_count,
-            COALESCE(SUM(total_input_tokens + total_output_tokens), 0)::bigint as total_tokens
+            COALESCE(SUM(total_tokens), 0)::bigint as total_tokens
         FROM
             usage u
         JOIN
