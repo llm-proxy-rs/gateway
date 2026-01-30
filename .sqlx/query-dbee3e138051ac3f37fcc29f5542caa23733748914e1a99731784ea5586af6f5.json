@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COUNT(*) as \"api_keys_count!\",\n            COUNT(*) FILTER (WHERE is_disabled = false) as \"api_keys_count_active!\"\n        FROM api_keys\n        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "api_keys_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "api_keys_count_active!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "dbee3e138051ac3f37fcc29f5542caa23733748914e1a99731784ea5586af6f5"
+}
