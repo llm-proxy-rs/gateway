@@ -15,9 +15,10 @@ pub async fn index(session: Session, state: State<AppState>) -> Result<Response,
 
     let html = match email {
         Some(ref email) => {
-            let (usage_count, total_tokens) = users::get_usage_stats(&state.db_pool, email)
-                .await
-                .unwrap_or((0, 0));
+            let (user_usage_count, user_total_tokens) =
+                users::get_user_usage_count_and_user_total_tokens(&state.db_pool, email)
+                    .await
+                    .unwrap_or((0, 0));
 
             let (api_keys_count, api_keys_count_active) =
                 get_api_keys_count_and_api_keys_count_active(&state.db_pool, email)
@@ -50,8 +51,8 @@ pub async fn index(session: Session, state: State<AppState>) -> Result<Response,
                 </html>
                 "#,
                 common_styles(),
-                usage_count,
-                total_tokens,
+                user_usage_count,
+                user_total_tokens,
                 api_keys_count_active,
                 api_keys_count,
                 nav_menu()

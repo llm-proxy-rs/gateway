@@ -4,6 +4,7 @@ pub fn common_styles() -> &'static str {
             table {
                 border-collapse: collapse;
                 margin: 20px 0 0 0;
+                width: 100%;
             }
             th, td {
                 border: 1px solid #ddd;
@@ -15,6 +16,12 @@ pub fn common_styles() -> &'static str {
             }
             tr:nth-child(even) {
                 background-color: #f9f9f9;
+            }
+            input[type="text"] {
+                width: 400px;
+            }
+            form {
+                margin: 0;
             }
         </style>
     "#

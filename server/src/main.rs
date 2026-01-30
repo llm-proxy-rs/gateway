@@ -21,9 +21,9 @@ use tower_sessions::{ExpiredDeletion, Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{error, info};
 
-use config::load_config;
-use database::setup_database;
-use handlers::{
+use crate::config::load_config;
+use crate::database::setup_database;
+use crate::handlers::{
     add_model::{add_model_get, add_model_post},
     browse_models::{browse_models_get, browse_models_post},
     chat_completions::chat_completions,

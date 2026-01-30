@@ -1,21 +1,7 @@
 use anyhow::Result;
 use axum::http::HeaderMap;
-use serde::Serialize;
 use sqlx::PgPool;
-use sqlx::types::time::OffsetDateTime;
 use uuid::Uuid;
-
-#[derive(Serialize)]
-pub struct ApiKeyResponse {
-    pub api_key_id: Uuid,
-    pub api_key: String,
-    pub created_at: OffsetDateTime,
-}
-
-#[derive(Serialize)]
-pub struct ApiKeysResponse {
-    pub keys: Vec<ApiKeyResponse>,
-}
 
 pub async fn create_api_key(pool: &PgPool, user_email: &str) -> Result<Uuid> {
     let api_key = Uuid::new_v4();

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COUNT(*) as \"user_usage_count!\",\n            COALESCE(SUM(total_tokens), 0)::bigint as \"user_total_tokens!\"\n        FROM\n            usage u\n        JOIN\n            users usr ON u.user_id = usr.user_id\n        WHERE\n            usr.email = $1\n            AND date_trunc('month', u.created_at) = date_trunc('month', now())\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_usage_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_total_tokens!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "db40359b11319c30cfba616fa39cee26feee0613df23cf097f81507a1457d0ab"
+}

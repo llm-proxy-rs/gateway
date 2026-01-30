@@ -38,7 +38,7 @@ pub async fn add_model_get(token: CsrfToken, session: Session) -> Result<Respons
                 <form action="/add-model" method="post">
                     <input type="hidden" name="authenticity_token" value="{}">
                     <label for="model_name">Model Name:</label><br>
-                    <input type="text" id="model_name" name="model_name" required style="width: 400px;"><br><br>
+                    <input type="text" id="model_name" name="model_name" required><br><br>
                     <button type="submit">Add Model</button>
                 </form>
                 {}

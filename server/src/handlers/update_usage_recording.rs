@@ -7,7 +7,7 @@ use myerrors::AppError;
 use myhandlers::AppState;
 use serde::Deserialize;
 use tower_sessions::Session;
-use users::{get_user_usage_recording, update_user_usage_recording};
+use users::{get_user_usage_record, update_user_usage_record};
 
 use crate::csrf::{get_authenticity_token, verify_authenticity_token};
 use crate::templates::common::{common_styles, nav_menu};
@@ -29,7 +29,7 @@ pub async fn update_usage_recording_get(
 
     let authenticity_token = get_authenticity_token(&token, &session).await?;
 
-    let usage_record = get_user_usage_recording(state.db_pool.as_ref(), &email).await?;
+    let usage_record = get_user_usage_record(state.db_pool.as_ref(), &email).await?;
 
     let status = if usage_record { "enabled" } else { "disabled" };
     let action = if usage_record { "Disable" } else { "Enable" };
@@ -77,7 +77,7 @@ pub async fn update_usage_recording_post(
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    update_user_usage_recording(state.db_pool.as_ref(), &email).await?;
+    update_user_usage_record(state.db_pool.as_ref(), &email).await?;
 
     Ok(Redirect::to("/update-usage-recording").into_response())
 }

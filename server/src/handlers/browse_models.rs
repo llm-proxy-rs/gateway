@@ -39,7 +39,7 @@ pub async fn browse_models_get(
         } else {
             format!(
                 r#"<td>
-                    <form action="/browse-models" method="post" style="margin: 0;">
+                    <form action="/browse-models" method="post">
                         <input type="hidden" name="authenticity_token" value="{}">
                         <input type="hidden" name="model_name" value="{}">
                         <button type="submit">Delete</button>
