@@ -49,12 +49,15 @@ pub async fn disable_all_api_keys(pool: &PgPool, user_email: &str) -> Result<u64
     Ok(result.rows_affected())
 }
 
-pub async fn get_api_keys_summary(pool: &PgPool, user_email: &str) -> Result<(i64, i64)> {
+pub async fn get_total_api_keys_and_active_api_keys(
+    pool: &PgPool,
+    user_email: &str,
+) -> Result<(i64, i64)> {
     let result = sqlx::query!(
         r#"
         SELECT
-            COUNT(*) as "total!",
-            COUNT(*) FILTER (WHERE is_disabled = false) as "active!"
+            COUNT(*) as "total_api_keys!",
+            COUNT(*) FILTER (WHERE is_disabled = false) as "active_api_keys!"
         FROM api_keys
         WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
         "#,
@@ -63,7 +66,7 @@ pub async fn get_api_keys_summary(pool: &PgPool, user_email: &str) -> Result<(i6
     .fetch_one(pool)
     .await?;
 
-    Ok((result.total, result.active))
+    Ok((result.total_api_keys, result.active_api_keys))
 }
 
 pub async fn get_api_key(headers: &HeaderMap) -> Option<String> {

@@ -1,6 +1,6 @@
 use anthropic_request::V1MessagesRequest;
 use anyhow::Context;
-use apikeys::{get_api_key, get_api_keys_summary};
+use apikeys::{get_api_key, get_total_api_keys_and_active_api_keys};
 use aws_sdk_bedrockruntime::types::TokenUsage;
 use axum::{
     Json, Router,
@@ -251,9 +251,10 @@ async fn index_get(session: Session, state: State<AppState>) -> Result<Response,
                 .await
                 .unwrap_or((0, 0));
 
-            let (total_keys, active_keys) = get_api_keys_summary(&state.db_pool, email)
-                .await
-                .unwrap_or((0, 0));
+            let (total_api_keys, active_api_keys) =
+                get_total_api_keys_and_active_api_keys(&state.db_pool, email)
+                    .await
+                    .unwrap_or((0, 0));
 
             format!(
                 r#"
@@ -283,8 +284,8 @@ async fn index_get(session: Session, state: State<AppState>) -> Result<Response,
                 common_styles(),
                 usage_count,
                 total_tokens,
-                active_keys,
-                total_keys,
+                active_api_keys,
+                total_api_keys,
                 nav_menu()
             )
         }
