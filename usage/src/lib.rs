@@ -42,7 +42,7 @@ pub async fn create_usage(pool: &PgPool, create_usage: &CreateUsageRequest) -> R
                 WHERE model_name = $2
             ) m ON true
         JOIN
-            users u ON u.user_id = ak.user_id AND u.usage_record = true
+            users u ON u.user_id = ak.user_id AND u.usage_tracking_enabled = true
         "#,
         create_usage.api_key.to_lowercase(),
         create_usage.model_name.to_lowercase(),
