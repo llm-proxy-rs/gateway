@@ -97,3 +97,28 @@ pub async fn delete_usage_records(pool: &PgPool, user_email: &str) -> Result<u64
 
     Ok(result.rows_affected())
 }
+
+pub async fn get_usage_count_and_usage_total_tokens(
+    pool: &PgPool,
+    email: &str,
+) -> Result<(i64, i64)> {
+    let result = sqlx::query!(
+        r#"
+        SELECT
+            COUNT(*) as "usage_count!",
+            COALESCE(SUM(total_tokens), 0)::bigint as "usage_total_tokens!"
+        FROM
+            usage u
+        JOIN
+            users usr ON u.user_id = usr.user_id
+        WHERE
+            usr.email = $1
+            AND date_trunc('month', u.created_at) = date_trunc('month', now())
+        "#,
+        email.to_lowercase()
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok((result.usage_count, result.usage_total_tokens))
+}

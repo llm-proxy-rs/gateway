@@ -6,6 +6,7 @@ use axum::{
 use myerrors::AppError;
 use myhandlers::AppState;
 use tower_sessions::Session;
+use usage::get_usage_count_and_usage_total_tokens;
 use users::create_user;
 
 use crate::templates::common::{common_styles, nav_menu};
@@ -15,8 +16,8 @@ pub async fn index(session: Session, state: State<AppState>) -> Result<Response,
 
     let html = match email {
         Some(ref email) => {
-            let (user_usage_count, user_total_tokens) =
-                users::get_user_usage_count_and_user_total_tokens(&state.db_pool, email)
+            let (usage_count, usage_total_tokens) =
+                get_usage_count_and_usage_total_tokens(&state.db_pool, email)
                     .await
                     .unwrap_or((0, 0));
 
@@ -51,8 +52,8 @@ pub async fn index(session: Session, state: State<AppState>) -> Result<Response,
                 </html>
                 "#,
                 common_styles(),
-                user_usage_count,
-                user_total_tokens,
+                usage_count,
+                usage_total_tokens,
                 api_keys_count_active,
                 api_keys_count,
                 nav_menu()
