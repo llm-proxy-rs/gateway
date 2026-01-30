@@ -4296,7 +4296,6 @@ dependencies = [
  "serde_with",
  "sqlx",
  "time",
- "uuid",
 ]
 
 [[package]]

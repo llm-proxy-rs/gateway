@@ -1,6 +1,6 @@
 use anthropic_request::V1MessagesRequest;
 use anyhow::Context;
-use apikeys::{get_api_key, get_total_api_keys_and_active_api_keys};
+use apikeys::{get_api_key, get_api_keys_count_and_api_keys_count_active};
 use aws_sdk_bedrockruntime::types::TokenUsage;
 use axum::{
     Json, Router,
@@ -21,7 +21,7 @@ use futures::Stream;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{delete_model, get_models, to_models_response};
 use myerrors::AppError;
-use myhandlers::{AppState, callback_get, login_get, logout_get};
+use myhandlers::{AppState, callback, login, logout};
 use request::ChatCompletionsRequest;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -251,8 +251,8 @@ async fn index_get(session: Session, state: State<AppState>) -> Result<Response,
                 .await
                 .unwrap_or((0, 0));
 
-            let (total_api_keys, active_api_keys) =
-                get_total_api_keys_and_active_api_keys(&state.db_pool, email)
+            let (api_keys_count, api_keys_count_active) =
+                get_api_keys_count_and_api_keys_count_active(&state.db_pool, email)
                     .await
                     .unwrap_or((0, 0));
 
@@ -284,8 +284,8 @@ async fn index_get(session: Session, state: State<AppState>) -> Result<Response,
                 common_styles(),
                 usage_count,
                 total_tokens,
-                active_api_keys,
-                total_api_keys,
+                api_keys_count_active,
+                api_keys_count,
                 nav_menu()
             )
         }
@@ -782,7 +782,7 @@ async fn browse_models_get(
         } else {
             format!(
                 r#"<td>
-                    <form action="/delete-model" method="post" style="margin: 0;">
+                    <form action="/browse-models" method="post" style="margin: 0;">
                         <input type="hidden" name="authenticity_token" value="{}">
                         <input type="hidden" name="model_name" value="{}">
                         <button type="submit">Delete</button>
@@ -962,7 +962,7 @@ struct DeleteModelForm {
     model_name: String,
 }
 
-async fn delete_model_post(
+async fn browse_models_post(
     token: CsrfToken,
     session: Session,
     state: State<AppState>,
@@ -1205,9 +1205,11 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(index_get))
         .route("/add-model", get(add_model_get).post(add_model_post))
-        .route("/browse-models", get(browse_models_get))
-        .route("/callback", get(callback_get))
-        .route("/delete-model", post(delete_model_post))
+        .route(
+            "/browse-models",
+            get(browse_models_get).post(browse_models_post),
+        )
+        .route("/callback", get(callback))
         .route(
             "/disable-api-keys",
             get(disable_api_keys_get).post(disable_api_keys_post),
@@ -1216,8 +1218,8 @@ async fn main() -> anyhow::Result<()> {
             "/generate-api-key",
             get(generate_api_key_get).post(generate_api_key_post),
         )
-        .route("/login", get(login_get))
-        .route("/logout", get(logout_get))
+        .route("/login", get(login))
+        .route("/logout", get(logout))
         .route("/view-usage-history", get(view_usage_history_get))
         .route(
             "/update-usage-recording",

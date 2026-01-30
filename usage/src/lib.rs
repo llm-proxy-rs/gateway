@@ -3,7 +3,6 @@ use serde::Serialize;
 use sqlx::PgPool;
 use sqlx::types::time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
-use uuid::Uuid;
 
 #[serde_with::serde_as]
 #[derive(Serialize)]
@@ -12,20 +11,6 @@ pub struct Usage {
     pub total_tokens: i64,
     #[serde_as(as = "Rfc3339")]
     pub created_at: OffsetDateTime,
-}
-
-#[derive(Serialize)]
-pub struct UsageResponse {
-    pub usage_id: Uuid,
-    pub model_name: String,
-    pub total_tokens: i64,
-    pub created_at: OffsetDateTime,
-}
-
-#[derive(Serialize)]
-pub struct UsageRecordsResponse {
-    pub records: Vec<Usage>,
-    pub total: i64,
 }
 
 pub struct CreateUsageRequest {
