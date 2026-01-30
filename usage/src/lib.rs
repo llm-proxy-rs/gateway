@@ -100,7 +100,7 @@ pub async fn delete_usage_records(pool: &PgPool, user_email: &str) -> Result<u64
 
 pub async fn get_usage_count_and_usage_total_tokens(
     pool: &PgPool,
-    email: &str,
+    user_email: &str,
 ) -> Result<(i64, i64)> {
     let result = sqlx::query!(
         r#"
@@ -115,7 +115,7 @@ pub async fn get_usage_count_and_usage_total_tokens(
             usr.email = $1
             AND date_trunc('month', u.created_at) = date_trunc('month', now())
         "#,
-        email.to_lowercase()
+        user_email.to_lowercase()
     )
     .fetch_one(pool)
     .await?;

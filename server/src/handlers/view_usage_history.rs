@@ -21,14 +21,14 @@ pub async fn view_usage_history(
     let usage_records = get_usage_records(&state.db_pool, &email, 100).await?;
 
     let mut rows = String::new();
-    for record in usage_records {
+    for usage_record in usage_records {
         rows.push_str(&format!(
             r#"<tr>
                 <td>{}</td>
                 <td>{}</td>
                 <td>{}</td>
             </tr>"#,
-            record.model_name, record.total_tokens, record.created_at
+            usage_record.model_name, usage_record.total_tokens, usage_record.created_at
         ));
     }
 

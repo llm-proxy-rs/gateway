@@ -6,7 +6,7 @@ pub mod disable_api_keys;
 pub mod generate_api_key;
 pub mod index;
 pub mod models;
-pub mod update_usage_recording;
+pub mod update_usage_tracking;
 pub mod usage_callback;
 pub mod v1_messages;
 pub mod view_usage_history;

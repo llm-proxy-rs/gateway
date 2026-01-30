@@ -10,7 +10,10 @@ pub async fn create_user(pool: &PgPool, email: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn toggle_user_usage_tracking(pool: &PgPool, user_email: &str) -> anyhow::Result<()> {
+pub async fn toggle_user_usage_tracking_enabled(
+    pool: &PgPool,
+    user_email: &str,
+) -> anyhow::Result<()> {
     sqlx::query!(
         "UPDATE users SET usage_tracking_enabled = NOT usage_tracking_enabled WHERE email = $1",
         user_email.to_lowercase()

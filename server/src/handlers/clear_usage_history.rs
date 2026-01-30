@@ -70,7 +70,7 @@ pub async fn clear_usage_history_post(
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    let deleted_count = delete_usage_records(state.db_pool.as_ref(), &email).await?;
+    let deleted_usage_records_count = delete_usage_records(state.db_pool.as_ref(), &email).await?;
 
     let html = format!(
         r#"
@@ -89,7 +89,7 @@ pub async fn clear_usage_history_post(
         </html>
         "#,
         common_styles(),
-        deleted_count,
+        deleted_usage_records_count,
         nav_menu()
     );
 

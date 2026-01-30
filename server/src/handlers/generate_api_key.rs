@@ -1,3 +1,4 @@
+use apikeys::create_api_key;
 use axum::{
     extract::{Form, State},
     response::{Html, IntoResponse, Redirect, Response},
@@ -68,7 +69,7 @@ pub async fn generate_api_key_post(
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    let api_key = apikeys::create_api_key(&state.db_pool, &email).await?;
+    let api_key = create_api_key(&state.db_pool, &email).await?;
 
     let html = format!(
         r#"

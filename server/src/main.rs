@@ -32,7 +32,7 @@ use crate::handlers::{
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     index::index,
     models::models,
-    update_usage_recording::{update_usage_recording_get, update_usage_recording_post},
+    update_usage_tracking::{update_usage_tracking_get, update_usage_tracking_post},
     v1_messages::v1_messages,
     view_usage_history::view_usage_history,
 };
@@ -134,8 +134,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/logout", get(logout))
         .route("/view-usage-history", get(view_usage_history))
         .route(
-            "/update-usage-recording",
-            get(update_usage_recording_get).post(update_usage_recording_post),
+            "/update-usage-tracking",
+            get(update_usage_tracking_get).post(update_usage_tracking_post),
         )
         .route(
             "/clear-usage-history",

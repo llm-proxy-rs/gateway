@@ -7,17 +7,17 @@ use myerrors::AppError;
 use myhandlers::AppState;
 use serde::Deserialize;
 use tower_sessions::Session;
-use users::{get_user_usage_tracking_enabled, toggle_user_usage_tracking};
+use users::{get_user_usage_tracking_enabled, toggle_user_usage_tracking_enabled};
 
 use crate::csrf::{get_authenticity_token, verify_authenticity_token};
 use crate::templates::common::{common_styles, nav_menu};
 
 #[derive(Deserialize)]
-pub struct UsageRecordingForm {
+pub struct UsageTrackingForm {
     pub authenticity_token: String,
 }
 
-pub async fn update_usage_recording_get(
+pub async fn update_usage_tracking_get(
     token: CsrfToken,
     session: Session,
     state: State<AppState>,
@@ -52,11 +52,11 @@ pub async fn update_usage_recording_get(
         </head>
         <body>
             <div>
-                <h1>Update Usage Recording</h1>
-                <p>Usage recording is currently <strong>{}</strong>.</p>
-                <form action="/update-usage-recording" method="post">
+                <h1>Update Usage Tracking</h1>
+                <p>Usage tracking is currently <strong>{}</strong>.</p>
+                <form action="/update-usage-tracking" method="post">
                     <input type="hidden" name="authenticity_token" value="{}">
-                    <button type="submit">{} Usage Recording</button>
+                    <button type="submit">{} Usage Tracking</button>
                 </form>
                 {}
             </div>
@@ -73,11 +73,11 @@ pub async fn update_usage_recording_get(
     Ok((token, Html(html)).into_response())
 }
 
-pub async fn update_usage_recording_post(
+pub async fn update_usage_tracking_post(
     token: CsrfToken,
     session: Session,
     state: State<AppState>,
-    form: Form<UsageRecordingForm>,
+    form: Form<UsageTrackingForm>,
 ) -> Result<Response, AppError> {
     let email = match session.get::<String>("email").await? {
         Some(email) => email,
@@ -86,7 +86,7 @@ pub async fn update_usage_recording_post(
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    toggle_user_usage_tracking(state.db_pool.as_ref(), &email).await?;
+    toggle_user_usage_tracking_enabled(state.db_pool.as_ref(), &email).await?;
 
-    Ok(Redirect::to("/update-usage-recording").into_response())
+    Ok(Redirect::to("/update-usage-tracking").into_response())
 }

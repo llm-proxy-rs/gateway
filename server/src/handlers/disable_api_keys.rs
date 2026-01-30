@@ -1,3 +1,4 @@
+use apikeys::disable_all_api_keys;
 use axum::{
     extract::{Form, State},
     response::{Html, IntoResponse, Redirect, Response},
@@ -69,7 +70,7 @@ pub async fn disable_api_keys_post(
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    let deleted_count = apikeys::disable_all_api_keys(&state.db_pool, &email).await?;
+    let disabled_api_keys_count = disable_all_api_keys(&state.db_pool, &email).await?;
 
     let html = format!(
         r#"
@@ -86,7 +87,7 @@ pub async fn disable_api_keys_post(
         </html>
         "#,
         common_styles(),
-        deleted_count
+        disabled_api_keys_count
     );
 
     Ok((token, Html(html)).into_response())

@@ -33,7 +33,7 @@ pub fn nav_menu() -> &'static str {
         <a href="/generate-api-key">Generate API Key</a>
         <a href="/disable-api-keys">Disable API Keys</a>
         <a href="/view-usage-history">View Usage History</a>
-        <a href="/update-usage-recording">Update Usage Recording</a>
+        <a href="/update-usage-tracking">Update Usage Tracking</a>
         <a href="/clear-usage-history">Clear Usage History</a>
         <a href="/browse-models">Browse Models</a>
         <a href="/add-model">Add Model</a>
