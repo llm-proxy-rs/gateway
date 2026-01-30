@@ -13,7 +13,7 @@ use myerrors::AppError;
 use myhandlers::AppState;
 use tracing::{debug, error};
 
-use crate::validation::check_api_key_and_model;
+use crate::validation::check_api_key_exists_and_model_exists;
 
 use super::usage_callback::create_usage_callback;
 
@@ -36,16 +36,17 @@ pub async fn v1_messages(
 
     payload.model = payload.model.to_lowercase();
 
-    let validation = check_api_key_and_model(&state.db_pool, &api_key, &payload.model).await?;
+    let (api_key_exists, model_exists) =
+        check_api_key_exists_and_model_exists(&state.db_pool, &api_key, &payload.model).await?;
 
-    if !validation.api_key_exists {
+    if !api_key_exists {
         error!("API key validation failed: Invalid API key");
         return Err(AppError::from(anyhow::anyhow!(
             "Invalid or missing API key"
         )));
     }
 
-    if !validation.model_exists {
+    if !model_exists {
         error!("Model name validation failed: Invalid model name");
         return Err(AppError::from(anyhow::anyhow!(
             "Invalid or missing model name"

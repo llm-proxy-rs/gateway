@@ -1,17 +1,11 @@
 use sqlx::PgPool;
 
-pub struct ValidationResult {
-    pub api_key_exists: bool,
-    pub model_exists: bool,
-}
-
-pub async fn check_api_key_and_model(
+pub async fn check_api_key_exists_and_model_exists(
     pool: &PgPool,
     api_key: &str,
     model_name: &str,
-) -> anyhow::Result<ValidationResult> {
-    let result = sqlx::query_as!(
-        ValidationResult,
+) -> anyhow::Result<(bool, bool)> {
+    let result = sqlx::query!(
         r#"
         SELECT
             EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE) as "api_key_exists!",
@@ -23,7 +17,7 @@ pub async fn check_api_key_and_model(
     .fetch_one(pool)
     .await?;
 
-    Ok(result)
+    Ok((result.api_key_exists, result.model_exists))
 }
 
 pub async fn check_api_key_exists(pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {

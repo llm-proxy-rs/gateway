@@ -25,12 +25,12 @@ pub async fn get_user_usage_tracking_enabled(
     pool: &PgPool,
     user_email: &str,
 ) -> anyhow::Result<bool> {
-    let usage_tracking_enabled = sqlx::query_scalar!(
+    let user_usage_tracking_enabled = sqlx::query_scalar!(
         "SELECT usage_tracking_enabled FROM users WHERE email = $1",
         user_email.to_lowercase()
     )
     .fetch_one(pool)
     .await?;
 
-    Ok(usage_tracking_enabled)
+    Ok(user_usage_tracking_enabled)
 }
