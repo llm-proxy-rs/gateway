@@ -19,12 +19,12 @@ pub struct AppState {
     pub db_pool: Arc<PgPool>,
 }
 
-pub async fn logout(session: Session) -> Result<Response, AppError> {
+pub async fn logout_get(session: Session) -> Result<Response, AppError> {
     session.remove::<String>("email").await?;
     Ok(Redirect::to("/").into_response())
 }
 
-pub async fn login(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+pub async fn login_get(session: Session, state: State<AppState>) -> Result<Response, AppError> {
     let state = State(handlers::AppState {
         client_id: state.cognito_client_id.clone(),
         client_secret: state.cognito_client_secret.clone(),
@@ -36,7 +36,7 @@ pub async fn login(session: Session, state: State<AppState>) -> Result<Response,
     Ok(handlers::login(session, state).await?)
 }
 
-pub async fn callback(
+pub async fn callback_get(
     query: Query<CallbackQuery>,
     session: Session,
     state: State<AppState>,

@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.100"
 rust_decimal = "1.40.0"
-serde = "1.0.228"
+serde = { version = "1.0.228", features = ["derive"] }
 serde_with = { version = "3.16.1", features = ["time_0_3"] }
 sqlx = { version = "0.8.6", features = ["bigdecimal", "postgres", "runtime-tokio", "time"] }
 time = "0.3.46"
+uuid = { version = "1.20.0", features = ["v4", "serde"] }

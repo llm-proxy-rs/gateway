@@ -3,6 +3,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use sqlx::types::time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use uuid::Uuid;
 
 #[serde_with::serde_as]
 #[derive(Serialize)]
@@ -13,13 +14,27 @@ pub struct Usage {
     pub created_at: OffsetDateTime,
 }
 
+#[derive(Serialize)]
+pub struct UsageResponse {
+    pub usage_id: Uuid,
+    pub model_name: String,
+    pub total_tokens: i64,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Serialize)]
+pub struct UsageRecordsResponse {
+    pub records: Vec<Usage>,
+    pub total: i64,
+}
+
 pub struct CreateUsageRequest {
     pub api_key: String,
     pub model_name: String,
     pub total_tokens: i32,
 }
 
-pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Result<()> {
+pub async fn create_usage(pool: &PgPool, create_usage: &CreateUsageRequest) -> Result<()> {
     sqlx::query!(
         r#"
         INSERT INTO usage (
@@ -44,8 +59,8 @@ pub async fn create_usage(pool: &PgPool, create_usage: CreateUsageRequest) -> Re
         JOIN
             users u ON u.user_id = ak.user_id AND u.usage_record = true
         "#,
-        create_usage.api_key,
-        create_usage.model_name,
+        create_usage.api_key.to_lowercase(),
+        create_usage.model_name.to_lowercase(),
         create_usage.total_tokens as i64
     )
     .execute(pool)
@@ -75,11 +90,25 @@ pub async fn get_usage_records(pool: &PgPool, email: &str, limit: i64) -> Result
             u.created_at DESC
         LIMIT $2
         "#,
-        email,
+        email.to_lowercase(),
         limit
     )
     .fetch_all(pool)
     .await?;
 
     Ok(records)
+}
+
+pub async fn delete_usage_records(pool: &PgPool, user_email: &str) -> Result<u64> {
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM usage
+        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
+        "#,
+        user_email.to_lowercase()
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
 }

@@ -1,6 +1,6 @@
 use anthropic_request::V1MessagesRequest;
 use anyhow::Context;
-use apikeys::get_api_key;
+use apikeys::{get_api_key, get_api_keys_summary};
 use aws_sdk_bedrockruntime::types::TokenUsage;
 use axum::{
     Json, Router,
@@ -21,7 +21,7 @@ use futures::Stream;
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use models::{delete_model, get_models, to_models_response};
 use myerrors::AppError;
-use myhandlers::{AppState, callback, login, logout};
+use myhandlers::{AppState, callback_get, login_get, logout_get};
 use request::ChatCompletionsRequest;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -33,8 +33,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_sessions::{ExpiredDeletion, Expiry, Session, SessionManagerLayer};
 use tower_sessions_sqlx_store::PostgresStore;
 use tracing::{debug, error, info};
-use usage::{CreateUsageRequest, create_usage, get_usage_records};
-use users::create_user;
+use usage::{CreateUsageRequest, create_usage, delete_usage_records, get_usage_records};
+use users::{create_user, get_user_usage_recording, update_user_usage_recording};
 
 #[derive(Clone, Deserialize)]
 struct AppConfig {
@@ -66,6 +66,25 @@ fn default_database_url() -> String {
     "postgres://postgres:postgres@localhost/gateway".to_string()
 }
 
+fn common_styles() -> &'static str {
+    r#"
+        <style>
+            table {
+                border-collapse: collapse;
+                margin: 20px 0 0 0;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+        </style>
+    "#
+}
+
 fn nav_menu() -> &'static str {
     r#"<br>
         <a href="/">Home</a>
@@ -80,15 +99,15 @@ fn nav_menu() -> &'static str {
     "#
 }
 
-fn make_usage_tracker(
-    db_pool: Arc<PgPool>,
+fn create_usage_callback(
+    pool: Arc<PgPool>,
     api_key: String,
     model_name: String,
 ) -> impl Fn(&TokenUsage) + Send + Sync + 'static {
     move |usage: &TokenUsage| {
         info!("Usage: {:?}", usage);
 
-        let db_pool = db_pool.clone();
+        let pool = pool.clone();
 
         let create_usage_request = CreateUsageRequest {
             api_key: api_key.clone(),
@@ -97,14 +116,14 @@ fn make_usage_tracker(
         };
 
         tokio::spawn(async move {
-            if let Err(e) = create_usage(&db_pool, create_usage_request).await {
+            if let Err(e) = create_usage(&pool, &create_usage_request).await {
                 error!("Failed to create usage: {}", e);
             }
         });
     }
 }
 
-async fn chat_completions(
+async fn chat_completions_post_api(
     headers: HeaderMap,
     State(state): State<AppState>,
     Json(mut payload): Json<ChatCompletionsRequest>,
@@ -118,17 +137,18 @@ async fn chat_completions(
         .await
         .context("Missing API key in Authorization header")?;
 
-    let (api_key_exists, model_name_exists) =
-        select_exists_api_key_and_model_name(&state.db_pool, &api_key, &payload.model).await?;
+    payload.model = payload.model.to_lowercase();
 
-    if !api_key_exists {
+    let validation = check_api_key_and_model(&state.db_pool, &api_key, &payload.model).await?;
+
+    if !validation.api_key_exists {
         error!("API key validation failed: Invalid API key");
         return Err(AppError::from(anyhow::anyhow!(
             "Invalid or missing API key"
         )));
     }
 
-    if !model_name_exists {
+    if !validation.model_exists {
         error!("Model name validation failed: Invalid model name");
         return Err(AppError::from(anyhow::anyhow!(
             "Invalid or missing model name"
@@ -142,9 +162,7 @@ async fn chat_completions(
         )));
     }
 
-    payload.model = payload.model.to_lowercase();
-
-    let usage_callback = make_usage_tracker(
+    let usage_callback = create_usage_callback(
         state.db_pool.clone(),
         api_key.clone(),
         payload.model.clone(),
@@ -165,7 +183,7 @@ async fn chat_completions(
     Ok((StatusCode::OK, Sse::new(stream)))
 }
 
-async fn v1_messages(
+async fn v1_messages_post_api(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(mut payload): Json<V1MessagesRequest>,
@@ -182,17 +200,18 @@ async fn v1_messages(
         .await
         .context("Missing API key in Authorization header")?;
 
-    let (api_key_exists, model_name_exists) =
-        select_exists_api_key_and_model_name(&state.db_pool, &api_key, &payload.model).await?;
+    payload.model = payload.model.to_lowercase();
 
-    if !api_key_exists {
+    let validation = check_api_key_and_model(&state.db_pool, &api_key, &payload.model).await?;
+
+    if !validation.api_key_exists {
         error!("API key validation failed: Invalid API key");
         return Err(AppError::from(anyhow::anyhow!(
             "Invalid or missing API key"
         )));
     }
 
-    if !model_name_exists {
+    if !validation.model_exists {
         error!("Model name validation failed: Invalid model name");
         return Err(AppError::from(anyhow::anyhow!(
             "Invalid or missing model name"
@@ -206,9 +225,7 @@ async fn v1_messages(
         )));
     }
 
-    payload.model = payload.model.to_lowercase();
-
-    let usage_callback = make_usage_tracker(
+    let usage_callback = create_usage_callback(
         state.db_pool.clone(),
         api_key.clone(),
         payload.model.clone(),
@@ -222,52 +239,28 @@ async fn v1_messages(
     Ok((StatusCode::OK, Sse::new(stream)))
 }
 
-async fn index(session: Session, state: State<AppState>) -> Result<Response, AppError> {
-    let email = session.get::<String>("email").await?;
+async fn index_get(session: Session, state: State<AppState>) -> Result<Response, AppError> {
+    let email = session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase());
 
     let html = match email {
         Some(ref email) => {
-            let stats = users::get_usage_stats(&state.db_pool, email)
+            let (usage_count, total_tokens) = users::get_usage_stats(&state.db_pool, email)
                 .await
-                .unwrap_or(users::UsageStats {
-                    usage_count: 0,
-                    total_tokens: 0,
-                });
+                .unwrap_or((0, 0));
 
-            let (total_keys, active_keys) = sqlx::query!(
-                r#"
-                SELECT
-                    COUNT(*) as "total!",
-                    COUNT(*) FILTER (WHERE is_disabled = false) as "active!"
-                FROM api_keys
-                WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
-                "#,
-                email
-            )
-            .fetch_one(state.db_pool.as_ref())
-            .await
-            .map(|row| (row.total, row.active))
-            .unwrap_or((0, 0));
+            let (total_keys, active_keys) = get_api_keys_summary(&state.db_pool, email)
+                .await
+                .unwrap_or((0, 0));
 
             format!(
                 r#"
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <style>
-                        table {{
-                            border-collapse: collapse;
-                            margin: 20px 0 0 0;
-                        }}
-                        th, td {{
-                            border: 1px solid #ddd;
-                            padding: 8px;
-                            text-align: left;
-                        }}
-                        th {{
-                            background-color: #f2f2f2;
-                        }}
-                    </style>
+                    {}
                 </head>
                 <body>
                     <div>
@@ -287,24 +280,30 @@ async fn index(session: Session, state: State<AppState>) -> Result<Response, App
                 </body>
                 </html>
                 "#,
-                stats.usage_count,
-                stats.total_tokens,
+                common_styles(),
+                usage_count,
+                total_tokens,
                 active_keys,
                 total_keys,
                 nav_menu()
             )
         }
-        None => r#"
+        None => format!(
+            r#"
             <!DOCTYPE html>
             <html>
+            <head>
+                {}
+            </head>
             <body>
                 <div>
                     <a href="/login">Login</a>
                 </div>
             </body>
             </html>
-        "#
-        .to_string(),
+            "#,
+            common_styles()
+        ),
     };
 
     if let Some(ref email) = email {
@@ -360,7 +359,11 @@ async fn get_authenticity_token(token: &CsrfToken, session: &Session) -> Result<
 }
 
 async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -371,6 +374,9 @@ async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Resp
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Generate API Key</h1>
@@ -384,6 +390,7 @@ async fn generate_api_key_get(token: CsrfToken, session: Session) -> Result<Resp
         </body>
         </html>
         "#,
+        common_styles(),
         authenticity_token,
         nav_menu()
     );
@@ -397,7 +404,11 @@ async fn generate_api_key_post(
     state: State<AppState>,
     form: Form<ApiKeyForm>,
 ) -> Result<Response, AppError> {
-    let email = match session.get::<String>("email").await? {
+    let email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -410,6 +421,9 @@ async fn generate_api_key_post(
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Your API Key</h1>
@@ -420,6 +434,7 @@ async fn generate_api_key_post(
         </body>
         </html>
         "#,
+        common_styles(),
         api_key,
         nav_menu()
     );
@@ -427,11 +442,15 @@ async fn generate_api_key_post(
     Ok((token, Html(html)).into_response())
 }
 
-async fn view_usage_history(
+async fn view_usage_history_get(
     session: Session,
     state: State<AppState>,
 ) -> Result<Response, AppError> {
-    let email = match session.get::<String>("email").await? {
+    let email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -455,20 +474,7 @@ async fn view_usage_history(
         <!DOCTYPE html>
         <html>
         <head>
-            <style>
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                    margin: 20px 0 0 0;
-                }}
-                th, td {{
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                }}
-                th {{
-                    background-color: #f2f2f2;
-                }}
-            </style>
+            {}
         </head>
         <body>
             <div>
@@ -490,6 +496,7 @@ async fn view_usage_history(
         </body>
         </html>
         "#,
+        common_styles(),
         nav_menu()
     );
 
@@ -497,7 +504,11 @@ async fn view_usage_history(
 }
 
 async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -508,6 +519,9 @@ async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Resp
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Disable API Keys</h1>
@@ -522,6 +536,7 @@ async fn disable_api_keys_get(token: CsrfToken, session: Session) -> Result<Resp
         </body>
         </html>
         "#,
+        common_styles(),
         authenticity_token,
         nav_menu()
     );
@@ -540,7 +555,11 @@ async fn disable_api_keys_post(
     state: State<AppState>,
     Form(form): Form<DisableApiKeysForm>,
 ) -> Result<Response, AppError> {
-    let email = match session.get::<String>("email").await? {
+    let email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -553,6 +572,9 @@ async fn disable_api_keys_post(
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <h1>API Keys Disabled</h1>
             <p>{} API key(s) disabled.</p>
@@ -560,6 +582,7 @@ async fn disable_api_keys_post(
         </body>
         </html>
         "#,
+        common_styles(),
         deleted_count
     );
 
@@ -571,17 +594,18 @@ async fn update_usage_recording_get(
     session: Session,
     state: State<AppState>,
 ) -> Result<Response, AppError> {
-    let email = match session.get::<String>("email").await? {
+    let email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
     let authenticity_token = get_authenticity_token(&token, &session).await?;
 
-    let usage_record =
-        sqlx::query_scalar!("SELECT usage_record FROM users WHERE email = $1", email)
-            .fetch_one(state.db_pool.as_ref())
-            .await?;
+    let usage_record = get_user_usage_recording(state.db_pool.as_ref(), &email).await?;
 
     let status = if usage_record { "enabled" } else { "disabled" };
     let action = if usage_record { "Disable" } else { "Enable" };
@@ -590,6 +614,9 @@ async fn update_usage_recording_get(
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Update Usage Recording</h1>
@@ -603,6 +630,7 @@ async fn update_usage_recording_get(
         </body>
         </html>
         "#,
+        common_styles(),
         status,
         authenticity_token,
         action,
@@ -623,25 +651,28 @@ async fn update_usage_recording_post(
     state: State<AppState>,
     form: Form<UsageRecordingForm>,
 ) -> Result<Response, AppError> {
-    let email = match session.get::<String>("email").await? {
+    let email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    sqlx::query!(
-        "UPDATE users SET usage_record = NOT usage_record WHERE email = $1",
-        email
-    )
-    .execute(state.db_pool.as_ref())
-    .await?;
+    update_user_usage_recording(state.db_pool.as_ref(), &email).await?;
 
     Ok(Redirect::to("/update-usage-recording").into_response())
 }
 
 async fn clear_usage_history_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -652,6 +683,9 @@ async fn clear_usage_history_get(token: CsrfToken, session: Session) -> Result<R
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Clear Usage History</h1>
@@ -666,6 +700,7 @@ async fn clear_usage_history_get(token: CsrfToken, session: Session) -> Result<R
         </body>
         </html>
         "#,
+        common_styles(),
         authenticity_token,
         nav_menu()
     );
@@ -684,29 +719,26 @@ async fn clear_usage_history_post(
     state: State<AppState>,
     form: Form<ClearUsageHistoryForm>,
 ) -> Result<Response, AppError> {
-    let email = match session.get::<String>("email").await? {
+    let email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
 
     verify_authenticity_token(&token, &session, &form.authenticity_token).await?;
 
-    let result = sqlx::query!(
-        r#"
-        DELETE FROM usage
-        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
-        "#,
-        email
-    )
-    .execute(state.db_pool.as_ref())
-    .await?;
-
-    let deleted_count = result.rows_affected();
+    let deleted_count = delete_usage_records(state.db_pool.as_ref(), &email).await?;
 
     let html = format!(
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Usage History Cleared</h1>
@@ -716,6 +748,7 @@ async fn clear_usage_history_post(
         </body>
         </html>
         "#,
+        common_styles(),
         deleted_count,
         nav_menu()
     );
@@ -723,12 +756,16 @@ async fn clear_usage_history_post(
     Ok((token, Html(html)).into_response())
 }
 
-async fn browse_models(
+async fn browse_models_get(
     token: CsrfToken,
     session: Session,
     state: State<AppState>,
 ) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -768,20 +805,7 @@ async fn browse_models(
         <!DOCTYPE html>
         <html>
         <head>
-            <style>
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                    margin: 20px 0 0 0;
-                }}
-                th, td {{
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                }}
-                th {{
-                    background-color: #f2f2f2;
-                }}
-            </style>
+            {}
         </head>
         <body>
             <div>
@@ -802,6 +826,7 @@ async fn browse_models(
         </body>
         </html>
         "#,
+        common_styles(),
         nav_menu()
     );
 
@@ -809,7 +834,11 @@ async fn browse_models(
 }
 
 async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -820,6 +849,9 @@ async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, A
         r#"
         <!DOCTYPE html>
         <html>
+        <head>
+            {}
+        </head>
         <body>
             <div>
                 <h1>Add Model</h1>
@@ -834,6 +866,7 @@ async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, A
         </body>
         </html>
         "#,
+        common_styles(),
         authenticity_token,
         nav_menu()
     );
@@ -853,7 +886,11 @@ async fn add_model_post(
     state: State<AppState>,
     form: Form<AddModelForm>,
 ) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -866,6 +903,9 @@ async fn add_model_post(
                 r#"
                 <!DOCTYPE html>
                 <html>
+                <head>
+                    {}
+                </head>
                 <body>
                     <div>
                         <h1>Model Added</h1>
@@ -875,6 +915,7 @@ async fn add_model_post(
                 </body>
                 </html>
                 "#,
+                common_styles(),
                 form.model_name,
                 nav_menu()
             );
@@ -893,6 +934,9 @@ async fn add_model_post(
                 r#"
                 <!DOCTYPE html>
                 <html>
+                <head>
+                    {}
+                </head>
                 <body>
                     <div>
                         <h1>Error</h1>
@@ -902,6 +946,7 @@ async fn add_model_post(
                 </body>
                 </html>
                 "#,
+                common_styles(),
                 error_message,
                 nav_menu()
             );
@@ -922,7 +967,11 @@ async fn delete_model_post(
     state: State<AppState>,
     form: Form<DeleteModelForm>,
 ) -> Result<Response, AppError> {
-    let _email = match session.get::<String>("email").await? {
+    let _email = match session
+        .get::<String>("email")
+        .await?
+        .map(|e| e.to_lowercase())
+    {
         Some(email) => email,
         None => return Ok(Redirect::to("/login").into_response()),
     };
@@ -935,6 +984,9 @@ async fn delete_model_post(
                 r#"
                 <!DOCTYPE html>
                 <html>
+                <head>
+                    {}
+                </head>
                 <body>
                     <div>
                         <h1>Model Deleted</h1>
@@ -944,6 +996,7 @@ async fn delete_model_post(
                 </body>
                 </html>
                 "#,
+                common_styles(),
                 form.model_name,
                 nav_menu()
             );
@@ -965,6 +1018,9 @@ async fn delete_model_post(
                 r#"
                 <!DOCTYPE html>
                 <html>
+                <head>
+                    {}
+                </head>
                 <body>
                     <div>
                         <h1>Error</h1>
@@ -974,6 +1030,7 @@ async fn delete_model_post(
                 </body>
                 </html>
                 "#,
+                common_styles(),
                 error_message,
                 nav_menu()
             );
@@ -982,7 +1039,7 @@ async fn delete_model_post(
     }
 }
 
-async fn models(
+async fn models_get_api(
     headers: HeaderMap,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -990,7 +1047,7 @@ async fn models(
         .await
         .context("Missing API key in Authorization header")?;
 
-    let api_key_exists = select_exists_api_key(&state.db_pool, &api_key).await?;
+    let api_key_exists = check_api_key_exists(&state.db_pool, &api_key).await?;
 
     if !api_key_exists {
         return Err(AppError::from(anyhow::anyhow!(
@@ -1028,37 +1085,43 @@ async fn setup_database(database_url: &str) -> anyhow::Result<PgPool> {
     Ok(pool)
 }
 
-async fn select_exists_api_key_and_model_name(
-    db_pool: &PgPool,
+struct ValidationResult {
+    api_key_exists: bool,
+    model_exists: bool,
+}
+
+async fn check_api_key_and_model(
+    pool: &PgPool,
     api_key: &str,
     model_name: &str,
-) -> anyhow::Result<(bool, bool)> {
-    let result: (bool, bool) = sqlx::query_as(
+) -> anyhow::Result<ValidationResult> {
+    let result = sqlx::query_as!(
+        ValidationResult,
         r#"
         SELECT
-            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE),
-            EXISTS (SELECT 1 FROM models WHERE model_name = $2);
+            EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE) as "api_key_exists!",
+            EXISTS (SELECT 1 FROM models WHERE model_name = $2) as "model_exists!"
         "#,
+        api_key.to_lowercase(),
+        model_name.to_lowercase()
     )
-    .bind(api_key)
-    .bind(model_name)
-    .fetch_one(db_pool)
+    .fetch_one(pool)
     .await?;
 
     Ok(result)
 }
 
-async fn select_exists_api_key(db_pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {
-    let result: bool = sqlx::query_scalar(
+async fn check_api_key_exists(pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {
+    let result = sqlx::query_scalar!(
         r#"
         SELECT EXISTS (SELECT 1 FROM api_keys WHERE api_key = $1 AND is_disabled = FALSE)
         "#,
+        api_key.to_lowercase()
     )
-    .bind(api_key)
-    .fetch_one(db_pool)
+    .fetch_one(pool)
     .await?;
 
-    Ok(result)
+    Ok(result.unwrap_or(false))
 }
 
 #[tokio::main]
@@ -1112,9 +1175,9 @@ async fn main() -> anyhow::Result<()> {
         .allow_origin(Any);
 
     let api = Router::new()
-        .route("/chat/completions", post(chat_completions))
-        .route("/v1/messages", post(v1_messages))
-        .route("/models", get(models))
+        .route("/chat/completions", post(chat_completions_post_api))
+        .route("/v1/messages", post(v1_messages_post_api))
+        .route("/models", get(models_get_api))
         .layer(cors_layer);
 
     let mut csrf_config = CsrfConfig::default().with_salt(app_config.csrf_salt);
@@ -1139,10 +1202,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app = Router::new()
-        .route("/", get(index))
+        .route("/", get(index_get))
         .route("/add-model", get(add_model_get).post(add_model_post))
-        .route("/browse-models", get(browse_models))
-        .route("/callback", get(callback))
+        .route("/browse-models", get(browse_models_get))
+        .route("/callback", get(callback_get))
         .route("/delete-model", post(delete_model_post))
         .route(
             "/disable-api-keys",
@@ -1152,9 +1215,9 @@ async fn main() -> anyhow::Result<()> {
             "/generate-api-key",
             get(generate_api_key_get).post(generate_api_key_post),
         )
-        .route("/login", get(login))
-        .route("/logout", get(logout))
-        .route("/view-usage-history", get(view_usage_history))
+        .route("/login", get(login_get))
+        .route("/logout", get(logout_get))
+        .route("/view-usage-history", get(view_usage_history_get))
         .route(
             "/update-usage-recording",
             get(update_usage_recording_get).post(update_usage_recording_post),

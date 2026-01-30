@@ -1,10 +1,18 @@
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use sqlx::types::time::OffsetDateTime;
 
 #[derive(Deserialize)]
 pub struct Model {
     pub model_name: String,
     pub protected: bool,
+}
+
+#[derive(Serialize)]
+pub struct ModelResponse {
+    pub model_name: String,
+    pub protected: bool,
+    pub created_at: OffsetDateTime,
 }
 
 #[derive(Serialize)]
@@ -44,7 +52,7 @@ pub async fn create_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()>
         INSERT INTO models (model_name)
         VALUES ($1)
         "#,
-        model_name
+        model_name.to_lowercase()
     )
     .execute(pool)
     .await?;
@@ -58,7 +66,7 @@ pub async fn delete_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()>
         DELETE FROM models
         WHERE model_name = $1 AND protected = false
         "#,
-        model_name
+        model_name.to_lowercase()
     )
     .execute(pool)
     .await?;
