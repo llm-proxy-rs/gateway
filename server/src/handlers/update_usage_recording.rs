@@ -29,15 +29,15 @@ pub async fn update_usage_recording_get(
 
     let authenticity_token = get_authenticity_token(&token, &session).await?;
 
-    let usage_tracking_enabled =
+    let user_usage_tracking_enabled =
         get_user_usage_tracking_enabled(state.db_pool.as_ref(), &email).await?;
 
-    let status = if usage_tracking_enabled {
+    let status = if user_usage_tracking_enabled {
         "enabled"
     } else {
         "disabled"
     };
-    let action = if usage_tracking_enabled {
+    let action = if user_usage_tracking_enabled {
         "Disable"
     } else {
         "Enable"
