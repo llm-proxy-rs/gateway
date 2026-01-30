@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM usage\n        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "38df778f12b652463713c80ee3d07b8f76f3c5f4c020ed8a5228b53f7edb1cef"
+}

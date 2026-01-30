@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.98"
-rust_decimal = "1.37.1"
-serde = "1.0.219"
-serde_with = { version = "3.12.0", features = ["time_0_3"] }
-sqlx = { version = "0.8.5", features = ["bigdecimal", "postgres", "runtime-tokio", "time"] }
-time = "0.3.41"
+anyhow = "1.0.100"
+rust_decimal = "1.40.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_with = { version = "3.16.1", features = ["time_0_3"] }
+sqlx = { version = "0.8.6", features = ["bigdecimal", "postgres", "runtime-tokio", "time"] }
+time = "0.3.46"
