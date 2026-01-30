@@ -1,18 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use sqlx::types::time::OffsetDateTime;
 
 #[derive(Deserialize)]
 pub struct Model {
     pub model_name: String,
     pub protected: bool,
-}
-
-#[derive(Serialize)]
-pub struct ModelResponse {
-    pub model_name: String,
-    pub protected: bool,
-    pub created_at: OffsetDateTime,
 }
 
 #[derive(Serialize)]
