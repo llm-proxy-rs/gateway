@@ -1,37 +1,67 @@
-use anyhow::Context;
+use serde::Serialize;
 use sqlx::PgPool;
+use sqlx::types::time::OffsetDateTime;
+use uuid::Uuid;
+
+#[derive(Serialize)]
+pub struct UserResponse {
+    pub user_id: Uuid,
+    pub email: String,
+    pub user_role: String,
+    pub usage_record: bool,
+    pub created_at: OffsetDateTime,
+}
 
 pub async fn create_user(pool: &PgPool, email: &str) -> anyhow::Result<()> {
-    sqlx::query("INSERT INTO users (email) VALUES ($1)")
-        .bind(email)
-        .execute(pool)
-        .await?;
+    sqlx::query!(
+        "INSERT INTO users (email) VALUES ($1)",
+        email.to_lowercase()
+    )
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
-pub async fn get_total_spent(pool: &PgPool, email: &str) -> anyhow::Result<f64> {
+pub async fn get_usage_stats(pool: &PgPool, email: &str) -> anyhow::Result<(i64, i64)> {
     let result = sqlx::query!(
         r#"
-        WITH updated_user AS (
-            UPDATE users
-            SET
-                total_spent = 0,
-                updated_at = now()
-            WHERE
-                email = $1
-                AND date_trunc('month', updated_at) <> date_trunc('month', now())
-            RETURNING total_spent
-        )
         SELECT
-            COALESCE(
-                (SELECT total_spent FROM updated_user),
-                (SELECT total_spent FROM users WHERE email = $1 LIMIT 1)
-            ) as total_spent
+            COUNT(*) as "usage_count!",
+            COALESCE(SUM(total_tokens), 0)::bigint as "total_tokens!"
+        FROM
+            usage u
+        JOIN
+            users usr ON u.user_id = usr.user_id
+        WHERE
+            usr.email = $1
+            AND date_trunc('month', u.created_at) = date_trunc('month', now())
         "#,
-        email
+        email.to_lowercase()
     )
     .fetch_one(pool)
     .await?;
 
-    result.total_spent.context("total_spent is null")
+    Ok((result.usage_count, result.total_tokens))
+}
+
+pub async fn update_user_usage_recording(pool: &PgPool, user_email: &str) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE users SET usage_record = NOT usage_record WHERE email = $1",
+        user_email.to_lowercase()
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_user_usage_recording(pool: &PgPool, user_email: &str) -> anyhow::Result<bool> {
+    let usage_record = sqlx::query_scalar!(
+        "SELECT usage_record FROM users WHERE email = $1",
+        user_email.to_lowercase()
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(usage_record)
 }

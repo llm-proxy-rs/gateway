@@ -1,7 +1,21 @@
 use anyhow::Result;
 use axum::http::HeaderMap;
+use serde::Serialize;
 use sqlx::PgPool;
+use sqlx::types::time::OffsetDateTime;
 use uuid::Uuid;
+
+#[derive(Serialize)]
+pub struct ApiKeyResponse {
+    pub api_key_id: Uuid,
+    pub api_key: String,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Serialize)]
+pub struct ApiKeysResponse {
+    pub keys: Vec<ApiKeyResponse>,
+}
 
 pub async fn create_api_key(pool: &PgPool, user_email: &str) -> Result<Uuid> {
     let api_key = Uuid::new_v4();
@@ -12,7 +26,7 @@ pub async fn create_api_key(pool: &PgPool, user_email: &str) -> Result<Uuid> {
         SELECT $1, user_id FROM users WHERE email = $2
         "#,
         api_key.to_string(),
-        user_email
+        user_email.to_lowercase()
     )
     .execute(pool)
     .await?;
@@ -27,12 +41,29 @@ pub async fn disable_all_api_keys(pool: &PgPool, user_email: &str) -> Result<u64
         SET is_disabled = TRUE, updated_at = now()
         WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
         "#,
-        user_email
+        user_email.to_lowercase()
     )
     .execute(pool)
     .await?;
 
     Ok(result.rows_affected())
+}
+
+pub async fn get_api_keys_summary(pool: &PgPool, user_email: &str) -> Result<(i64, i64)> {
+    let result = sqlx::query!(
+        r#"
+        SELECT
+            COUNT(*) as "total!",
+            COUNT(*) FILTER (WHERE is_disabled = false) as "active!"
+        FROM api_keys
+        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
+        "#,
+        user_email.to_lowercase()
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok((result.total, result.active))
 }
 
 pub async fn get_api_key(headers: &HeaderMap) -> Option<String> {

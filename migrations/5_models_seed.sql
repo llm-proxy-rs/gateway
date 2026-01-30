@@ -1,2 +1,4 @@
-INSERT INTO models (model_name, input_price_per_token, output_price_per_token)
-VALUES ('bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0', 0.000003, 0.000015);
+INSERT INTO models (model_name, protected)
+VALUES 
+    ('us.anthropic.claude-haiku-4-5-20251001-v1:0', true),
+    ('us.anthropic.claude-sonnet-4-5-20250929-v1:0', true);

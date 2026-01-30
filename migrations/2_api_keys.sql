@@ -3,6 +3,7 @@ create table if not exists api_keys (
     api_key_id uuid primary key default uuid_generate_v4(),
     constraint fk_user_id foreign key (user_id) references users(user_id),
     created_at timestamptz not null default now(),
+    is_disabled boolean not null default false,
     updated_at timestamptz not null default now(),
     user_id uuid not null
 );
