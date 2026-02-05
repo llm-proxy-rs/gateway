@@ -56,14 +56,16 @@ pub async fn get_api_keys_count_and_api_keys_count_active(
 }
 
 pub async fn get_api_key(headers: &HeaderMap) -> Option<String> {
-    headers
+    if let Some(token) = headers
         .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|auth| {
-            if auth.starts_with("Bearer ") {
-                Some(auth.trim_start_matches("Bearer ").trim().to_string())
-            } else {
-                None
-            }
-        })
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+    {
+        return Some(token.trim().to_string());
+    }
+
+    headers
+        .get("x-api-key")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.trim().to_string())
 }
