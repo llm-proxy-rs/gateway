@@ -11,7 +11,7 @@ use axum::{
 };
 use axum_csrf::{CsrfConfig, CsrfLayer, Key};
 use dotenv::dotenv;
-use http::header::{AUTHORIZATION, CONTENT_TYPE};
+use http::header::{AUTHORIZATION, CONTENT_TYPE, HeaderName};
 use myhandlers::{AppState, callback, login, logout};
 use std::sync::Arc;
 use tokio::signal;
@@ -84,7 +84,11 @@ async fn main() -> anyhow::Result<()> {
         .with_same_site(tower_sessions::cookie::SameSite::Lax);
 
     let cors_layer = CorsLayer::new()
-        .allow_headers([AUTHORIZATION, CONTENT_TYPE])
+        .allow_headers([
+            AUTHORIZATION,
+            CONTENT_TYPE,
+            HeaderName::from_static("x-api-key"),
+        ])
         .allow_origin(Any);
 
     let api = Router::new()
