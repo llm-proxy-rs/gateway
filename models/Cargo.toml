@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.101"
 serde = "1.0.228"
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio"] }

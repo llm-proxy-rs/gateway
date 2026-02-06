@@ -11,6 +11,8 @@ pub struct AppConfig {
     pub cognito_user_pool_id: String,
     pub csrf_cookie_key: String,
     pub csrf_salt: String,
+    #[serde(default = "default_inference_profile_prefixes")]
+    pub inference_profile_prefixes: Vec<String>,
     #[serde(default = "default_database_url")]
     pub database_url: String,
     #[serde(default = "default_host")]
@@ -29,6 +31,10 @@ fn default_port() -> u16 {
 
 fn default_database_url() -> String {
     "postgres://postgres:postgres@localhost/gateway".to_string()
+}
+
+fn default_inference_profile_prefixes() -> Vec<String> {
+    vec!["us.".to_string()]
 }
 
 pub async fn load_config() -> anyhow::Result<AppConfig> {

@@ -17,6 +17,7 @@ pub struct AppState {
     pub cognito_region: String,
     pub cognito_user_pool_id: String,
     pub db_pool: Arc<PgPool>,
+    pub inference_profile_prefixes: Vec<String>,
 }
 
 pub async fn logout(session: Session) -> Result<Response, AppError> {

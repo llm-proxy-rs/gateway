@@ -34,6 +34,7 @@ use crate::handlers::{
     models::models,
     update_usage_tracking::{update_usage_tracking_get, update_usage_tracking_post},
     v1_messages::v1_messages,
+    v1_messages_count_tokens::v1_messages_count_tokens,
     view_usage_history::view_usage_history,
 };
 
@@ -68,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
         cognito_region: app_config.cognito_region,
         cognito_user_pool_id: app_config.cognito_user_pool_id,
         db_pool: Arc::new(db_pool.clone()),
+        inference_profile_prefixes: app_config.inference_profile_prefixes,
     };
 
     let session_store = PostgresStore::new(db_pool);
@@ -94,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
     let api = Router::new()
         .route("/chat/completions", post(chat_completions))
         .route("/v1/messages", post(v1_messages))
+        .route("/v1/messages/count_tokens", post(v1_messages_count_tokens))
         .route("/models", get(models))
         .layer(cors_layer);
 

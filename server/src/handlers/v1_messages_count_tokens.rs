@@ -1,34 +1,29 @@
-use anthropic_request::V1MessagesRequest;
+use anthropic_request::V1MessagesCountTokensRequest;
+use anthropic_response::V1MessagesCountTokensResponse;
 use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json,
     extract::State,
     http::{HeaderMap, StatusCode},
-    response::sse::Sse,
+    response::IntoResponse,
 };
 use chat::provider::{BedrockV1MessagesProvider, V1MessagesProvider};
-use futures::Stream;
 use myerrors::AppError;
 use myhandlers::AppState;
-use tracing::{debug, error};
+use tracing::{error, info};
 
 use crate::validation::check_api_key_exists_and_model_exists;
 
-use super::usage_callback::create_usage_callback;
-
-pub async fn v1_messages(
+pub async fn v1_messages_count_tokens(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(mut payload): Json<V1MessagesRequest>,
-) -> Result<
-    (
-        StatusCode,
-        Sse<impl Stream<Item = Result<axum::response::sse::Event, anyhow::Error>>>,
-    ),
-    AppError,
-> {
-    debug!("Received v1/messages request for model: {}", payload.model);
+    Json(mut payload): Json<V1MessagesCountTokensRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    info!(
+        "Received Anthropic v1/messages/count_tokens request for model: {}",
+        payload.model
+    );
 
     let api_key = get_api_key(&headers)
         .await
@@ -53,23 +48,15 @@ pub async fn v1_messages(
         )));
     }
 
-    if payload.stream != Some(true) {
-        error!("Streaming is required but was disabled");
-        return Err(AppError::from(anyhow::anyhow!(
-            "Streaming is required but was disabled"
-        )));
-    }
-
-    let usage_callback = create_usage_callback(
-        state.db_pool.clone(),
-        api_key.clone(),
-        payload.model.clone(),
-    );
-
-    let stream = BedrockV1MessagesProvider::new()
-        .await
-        .v1_messages_stream(payload, usage_callback)
+    let provider = BedrockV1MessagesProvider::new().await;
+    let count = provider
+        .v1_messages_count_tokens(&payload, &state.inference_profile_prefixes)
         .await?;
 
-    Ok((StatusCode::OK, Sse::new(stream)))
+    Ok((
+        StatusCode::OK,
+        Json(V1MessagesCountTokensResponse {
+            input_tokens: count,
+        }),
+    ))
 }

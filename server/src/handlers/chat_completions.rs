@@ -29,7 +29,7 @@ pub async fn chat_completions(
 
     let api_key = get_api_key(&headers)
         .await
-        .context("Missing API key in Authorization header")?;
+        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
 
     payload.model = payload.model.to_lowercase();
 
