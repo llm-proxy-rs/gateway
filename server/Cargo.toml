@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.101"
 anthropic-request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 anthropic-response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 apikeys = { path = "../apikeys" }

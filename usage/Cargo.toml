@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.101"
 rust_decimal = "1.40.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_with = { version = "3.16.1", features = ["time_0_3"] }

@@ -13,7 +13,7 @@ pub async fn models(
 ) -> Result<impl IntoResponse, AppError> {
     let api_key = get_api_key(&headers)
         .await
-        .context("Missing API key in Authorization header")?;
+        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
 
     let api_key_exists = check_api_key_exists(&state.db_pool, &api_key).await?;
 
