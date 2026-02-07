@@ -53,8 +53,8 @@ pub async fn v1_messages(
         )));
     }
 
-    if payload.stream != Some(true) {
-        error!("Streaming is required but was disabled");
+    if payload.stream == Some(false) {
+        error!("Streaming is required but was disabled by client (stream: false)");
         return Err(AppError::from(anyhow::anyhow!(
             "Streaming is required but was disabled"
         )));
