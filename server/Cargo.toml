@@ -20,7 +20,7 @@ models = { path = "../models" }
 myerrors = { path = "../myerrors" }
 myhandlers = { path = "../myhandlers" }
 request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
-reqwest = "0.13.1"
+reqwest = "0.13.2"
 response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 serde = "1.0.228"
 sqlx = { version = "0.8.6", features = ["postgres"] }
