@@ -66,7 +66,7 @@ dependencies = [
 [[package]]
 name = "anthropic-request"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#25daf73ef9ad185f2bd524c2f6f43558432bbff4"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#c4b978be36676564f2903091dd4ceb7d0ebee28f"
 dependencies = [
  "anyhow",
  "aws-sdk-bedrockruntime",
@@ -79,7 +79,7 @@ dependencies = [
 [[package]]
 name = "anthropic-response"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#25daf73ef9ad185f2bd524c2f6f43558432bbff4"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#c4b978be36676564f2903091dd4ceb7d0ebee28f"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "serde",
@@ -835,7 +835,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "chat"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#25daf73ef9ad185f2bd524c2f6f43558432bbff4"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#c4b978be36676564f2903091dd4ceb7d0ebee28f"
 dependencies = [
  "anthropic-request",
  "anthropic-response",
@@ -849,7 +849,7 @@ dependencies = [
  "chrono",
  "futures",
  "request",
- "reqwest 0.13.1",
+ "reqwest 0.13.2",
  "reqwest-streams",
  "response",
  "serde",
@@ -904,7 +904,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#25daf73ef9ad185f2bd524c2f6f43558432bbff4"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#c4b978be36676564f2903091dd4ceb7d0ebee28f"
 dependencies = [
  "aws-smithy-types",
  "serde_json",
@@ -1522,7 +1522,7 @@ dependencies = [
  "chrono",
  "jwt",
  "oauth2",
- "reqwest 0.13.1",
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
  "token",
@@ -2044,7 +2044,7 @@ source = "git+https://github.com/llm-proxy-rs/cognito.git#4dfe4e3c4f51fdc6e287e6
 dependencies = [
  "anyhow",
  "jsonwebtoken",
- "reqwest 0.13.1",
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
 ]
@@ -2149,9 +2149,9 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.7.6"
+version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
+checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "mime"
@@ -2731,7 +2731,7 @@ dependencies = [
 [[package]]
 name = "request"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#25daf73ef9ad185f2bd524c2f6f43558432bbff4"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#c4b978be36676564f2903091dd4ceb7d0ebee28f"
 dependencies = [
  "anyhow",
  "aws-sdk-bedrockruntime",
@@ -2782,9 +2782,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04e9018c9d814e5f30cc16a0f03271aeab3571e609612d9fe78c1aa8d11c2f62"
+checksum = "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
 dependencies = [
  "base64",
  "bytes",
@@ -2834,7 +2834,7 @@ dependencies = [
  "bytes",
  "cargo-husky",
  "futures",
- "reqwest 0.13.1",
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
  "tokio-util",
@@ -2843,7 +2843,7 @@ dependencies = [
 [[package]]
 name = "response"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#25daf73ef9ad185f2bd524c2f6f43558432bbff4"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#c4b978be36676564f2903091dd4ceb7d0ebee28f"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "serde",
@@ -3328,7 +3328,7 @@ dependencies = [
  "myerrors",
  "myhandlers",
  "request",
- "reqwest 0.13.1",
+ "reqwest 0.13.2",
  "response",
  "serde",
  "sqlx",
@@ -3887,7 +3887,7 @@ source = "git+https://github.com/llm-proxy-rs/cognito.git#4dfe4e3c4f51fdc6e287e6
 dependencies = [
  "anyhow",
  "base64",
- "reqwest 0.13.1",
+ "reqwest 0.13.2",
 ]
 
 [[package]]
@@ -4458,9 +4458,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-streams"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
 dependencies = [
  "futures-util",
  "js-sys",
