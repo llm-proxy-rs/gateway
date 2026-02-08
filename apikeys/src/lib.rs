@@ -9,7 +9,7 @@ pub async fn create_api_key(pool: &PgPool, user_email: &str) -> Result<Uuid> {
     sqlx::query!(
         r#"
         INSERT INTO api_keys (api_key, user_id)
-        SELECT $1, user_id FROM users WHERE email = $2
+        SELECT $1, user_id FROM users WHERE user_email = $2
         "#,
         api_key.to_string(),
         user_email.to_lowercase()
@@ -25,7 +25,7 @@ pub async fn disable_all_api_keys(pool: &PgPool, user_email: &str) -> Result<u64
         r#"
         UPDATE api_keys
         SET is_disabled = TRUE, updated_at = now()
-        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
+        WHERE user_id = (SELECT user_id FROM users WHERE user_email = $1)
         "#,
         user_email.to_lowercase()
     )
@@ -45,7 +45,7 @@ pub async fn get_api_keys_count_and_api_keys_count_active(
             COUNT(*) as "api_keys_count!",
             COUNT(*) FILTER (WHERE is_disabled = false) as "api_keys_count_active!"
         FROM api_keys
-        WHERE user_id = (SELECT user_id FROM users WHERE email = $1)
+        WHERE user_id = (SELECT user_id FROM users WHERE user_email = $1)
         "#,
         user_email.to_lowercase()
     )

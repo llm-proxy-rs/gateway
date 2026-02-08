@@ -9,13 +9,15 @@ use axum::{
 };
 use chat::provider::{BedrockV1MessagesProvider, V1MessagesProvider};
 use futures::Stream;
+use inference_profiles::create_inference_profile;
 use myerrors::AppError;
 use myhandlers::AppState;
 use tracing::{debug, error};
 
-use crate::validation::check_api_key_exists_and_model_exists;
-
-use super::usage_callback::create_usage_callback;
+use crate::{
+    handlers::usage_callback::create_usage_callback,
+    validation::check_api_key_exists_and_model_exists_and_get_inference_profile_arn,
+};
 
 pub async fn v1_messages(
     State(state): State<AppState>,
@@ -34,10 +36,13 @@ pub async fn v1_messages(
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
 
-    payload.model = payload.model.to_lowercase();
-
-    let (api_key_exists, model_exists) =
-        check_api_key_exists_and_model_exists(&state.db_pool, &api_key, &payload.model).await?;
+    let (api_key_exists, model_exists, inference_profile_arn) =
+        check_api_key_exists_and_model_exists_and_get_inference_profile_arn(
+            &state.db_pool,
+            &api_key,
+            &payload.model,
+        )
+        .await?;
 
     if !api_key_exists {
         error!("API key validation failed: Invalid API key");
@@ -60,11 +65,24 @@ pub async fn v1_messages(
         )));
     }
 
-    let usage_callback = create_usage_callback(
-        state.db_pool.clone(),
-        api_key.clone(),
-        payload.model.clone(),
-    );
+    let model_name = if let Some(inference_profile_arn) = inference_profile_arn {
+        inference_profile_arn
+    } else {
+        create_inference_profile(
+            &state.db_pool,
+            &api_key,
+            &payload.model,
+            &state.aws_region,
+            &state.aws_account_id,
+            &state.inference_profile_prefixes,
+        )
+        .await
+        .unwrap_or(payload.model.to_lowercase())
+    };
+
+    let usage_callback = create_usage_callback(&model_name);
+
+    payload.model = model_name;
 
     let stream = BedrockV1MessagesProvider::new()
         .await

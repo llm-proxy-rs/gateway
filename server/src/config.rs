@@ -3,6 +3,9 @@ use serde::Deserialize;
 
 #[derive(Clone, Deserialize)]
 pub struct AppConfig {
+    pub aws_account_id: String,
+    #[serde(default = "default_aws_region")]
+    pub aws_region: String,
     pub cognito_client_id: String,
     pub cognito_client_secret: String,
     pub cognito_domain: String,
@@ -19,6 +22,10 @@ pub struct AppConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+}
+
+fn default_aws_region() -> String {
+    "us-east-1".to_string()
 }
 
 fn default_host() -> String {
