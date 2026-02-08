@@ -5,6 +5,10 @@ port = 3000
 # Database Configuration
 database_url = "postgres://postgres:postgres@localhost/gateway"
 
+# AWS Configuration
+aws_account_id = "your_aws_account_id"
+aws_region = "us-east-1"
+
 # AWS Cognito Configuration
 cognito_client_id = "your_cognito_client_id"
 cognito_client_secret = "your_cognito_client_secret"

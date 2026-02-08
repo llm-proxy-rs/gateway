@@ -10,6 +10,8 @@ use tower_sessions::Session;
 
 #[derive(Clone)]
 pub struct AppState {
+    pub aws_account_id: String,
+    pub aws_region: String,
     pub cognito_client_id: String,
     pub cognito_client_secret: String,
     pub cognito_domain: String,

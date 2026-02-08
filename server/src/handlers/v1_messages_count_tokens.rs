@@ -29,8 +29,6 @@ pub async fn v1_messages_count_tokens(
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
 
-    payload.model = payload.model.to_lowercase();
-
     let (api_key_exists, model_exists) =
         check_api_key_exists_and_model_exists(&state.db_pool, &api_key, &payload.model).await?;
 
@@ -47,6 +45,8 @@ pub async fn v1_messages_count_tokens(
             "Invalid or missing model name"
         )));
     }
+
+    payload.model = payload.model.to_lowercase();
 
     let provider = BedrockV1MessagesProvider::new().await;
     let count = provider

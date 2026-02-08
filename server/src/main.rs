@@ -27,15 +27,12 @@ use crate::handlers::{
     add_model::{add_model_get, add_model_post},
     browse_models::{browse_models_get, browse_models_post},
     chat_completions::chat_completions,
-    clear_usage_history::{clear_usage_history_get, clear_usage_history_post},
     disable_api_keys::{disable_api_keys_get, disable_api_keys_post},
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     index::index,
     models::models,
-    update_usage_tracking::{update_usage_tracking_get, update_usage_tracking_post},
     v1_messages::v1_messages,
     v1_messages_count_tokens::v1_messages_count_tokens,
-    view_usage_history::view_usage_history,
 };
 
 #[tokio::main]
@@ -62,6 +59,8 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app_state = AppState {
+        aws_account_id: app_config.aws_account_id,
+        aws_region: app_config.aws_region,
         cognito_client_id: app_config.cognito_client_id,
         cognito_client_secret: app_config.cognito_client_secret,
         cognito_domain: app_config.cognito_domain,
@@ -139,15 +138,6 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/login", get(login))
         .route("/logout", get(logout))
-        .route("/view-usage-history", get(view_usage_history))
-        .route(
-            "/update-usage-tracking",
-            get(update_usage_tracking_get).post(update_usage_tracking_post),
-        )
-        .route(
-            "/clear-usage-history",
-            get(clear_usage_history_get).post(clear_usage_history_post),
-        )
         .merge(api)
         .layer(CsrfLayer::new(csrf_config))
         .layer(session_layer)
