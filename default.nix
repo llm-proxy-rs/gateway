@@ -1,4 +1,4 @@
-{pkgs ? import <nixpkgs> {}}: let
+{pkgs ? import (import ./npins).nixpkgs.outPath {}}: let
   rustPackage = pkgs.rustPlatform.buildRustPackage {
     buildInputs = [pkgs.openssl];
     cargoHash = "sha256-x0JDAnqSAMXvBzQZQZeoTkU6UgbaCRKrqF5muJ9N+cE=";
