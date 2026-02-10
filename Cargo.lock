@@ -55,7 +55,7 @@ dependencies = [
 [[package]]
 name = "anthropic-request"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#10fdfe69e826d9d7b06c0080a14f6a8c8346a152"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#7ce8d229005311bfa8a9bcc3be0f126faf4e3338"
 dependencies = [
  "anyhow",
  "aws-sdk-bedrockruntime",
@@ -68,7 +68,7 @@ dependencies = [
 [[package]]
 name = "anthropic-response"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#10fdfe69e826d9d7b06c0080a14f6a8c8346a152"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#7ce8d229005311bfa8a9bcc3be0f126faf4e3338"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "serde",
@@ -772,7 +772,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "chat"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#10fdfe69e826d9d7b06c0080a14f6a8c8346a152"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#7ce8d229005311bfa8a9bcc3be0f126faf4e3338"
 dependencies = [
  "anthropic-request",
  "anthropic-response",
@@ -842,7 +842,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#10fdfe69e826d9d7b06c0080a14f6a8c8346a152"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#7ce8d229005311bfa8a9bcc3be0f126faf4e3338"
 dependencies = [
  "aws-smithy-types",
  "serde_json",
@@ -1948,9 +1948,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.180"
+version = "0.2.181"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
+checksum = "459427e2af2b9c839b132acb702a1c654d95e10f8c326bfc2ad11310e458b1c5"
 
 [[package]]
 name = "libm"
@@ -2542,7 +2542,7 @@ checksum = "cab834c73d247e67f4fae452806d17d3c7501756d98c8808d7c9c7aa7d18f973"
 [[package]]
 name = "request"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#10fdfe69e826d9d7b06c0080a14f6a8c8346a152"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#7ce8d229005311bfa8a9bcc3be0f126faf4e3338"
 dependencies = [
  "anyhow",
  "aws-sdk-bedrockruntime",
@@ -2654,7 +2654,7 @@ dependencies = [
 [[package]]
 name = "response"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#10fdfe69e826d9d7b06c0080a14f6a8c8346a152"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#7ce8d229005311bfa8a9bcc3be0f126faf4e3338"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "serde",
