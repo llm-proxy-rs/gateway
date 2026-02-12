@@ -1,5 +1,5 @@
 use anyhow::Result;
-use aws_sdk_bedrock::types::InferenceProfileModelSource;
+use aws_sdk_bedrock::types::{InferenceProfileModelSource, Tag};
 use sqlx::PgPool;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -26,10 +26,34 @@ pub async fn create_inference_profile(
 
     let inference_profile_name = Uuid::new_v4().to_string();
 
+    let ids = sqlx::query!(
+        r#"
+        SELECT ak.user_id, m.model_id
+        FROM api_keys ak, models m
+        WHERE ak.api_key = $1 AND m.model_name = $2
+        "#,
+        api_key.to_lowercase(),
+        model_name.to_lowercase(),
+    )
+    .fetch_one(pool)
+    .await?;
+
     let response = client
         .create_inference_profile()
         .inference_profile_name(&inference_profile_name)
         .model_source(InferenceProfileModelSource::CopyFrom(copy_from))
+        .tags(
+            Tag::builder()
+                .key("GatewayUserId")
+                .value(ids.user_id.to_string())
+                .build()?,
+        )
+        .tags(
+            Tag::builder()
+                .key("GatewayModelId")
+                .value(ids.model_id.to_string())
+                .build()?,
+        )
         .send()
         .await
         .map_err(|e| {
