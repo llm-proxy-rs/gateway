@@ -48,7 +48,7 @@ pub async fn v1_messages_count_tokens(
 
     payload.model = payload.model.to_lowercase();
 
-    let provider = BedrockV1MessagesProvider::new().await;
+    let provider = BedrockV1MessagesProvider::new(state.bedrockruntime_client.clone());
     let count = provider
         .v1_messages_count_tokens(&payload, &state.inference_profile_prefixes)
         .await?;

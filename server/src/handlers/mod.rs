@@ -3,6 +3,7 @@ pub mod browse_models;
 pub mod chat_completions;
 pub mod disable_api_keys;
 pub mod generate_api_key;
+pub mod health;
 pub mod index;
 pub mod models;
 pub mod usage_callback;
