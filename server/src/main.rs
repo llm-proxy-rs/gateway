@@ -5,6 +5,7 @@ mod handlers;
 mod templates;
 mod validation;
 
+use aws_sdk_bedrockruntime::Client;
 use axum::{
     Router,
     routing::{get, post},
@@ -29,6 +30,7 @@ use crate::handlers::{
     chat_completions::chat_completions,
     disable_api_keys::{disable_api_keys_get, disable_api_keys_post},
     generate_api_key::{generate_api_key_get, generate_api_key_post},
+    health::health,
     index::index,
     models::models,
     v1_messages::v1_messages,
@@ -58,9 +60,14 @@ async fn main() -> anyhow::Result<()> {
         info!("Cognito configuration loaded successfully");
     }
 
+    let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+    let bedrockruntime_client = Client::new(&aws_config);
+    info!("AWS Bedrock Runtime client initialized");
+
     let app_state = AppState {
         aws_account_id: app_config.aws_account_id,
         aws_region: app_config.aws_region,
+        bedrockruntime_client,
         cognito_client_id: app_config.cognito_client_id,
         cognito_client_secret: app_config.cognito_client_secret,
         cognito_domain: app_config.cognito_domain,
@@ -136,6 +143,7 @@ async fn main() -> anyhow::Result<()> {
             "/generate-api-key",
             get(generate_api_key_get).post(generate_api_key_post),
         )
+        .route("/health", get(health))
         .route("/login", get(login))
         .route("/logout", get(logout))
         .merge(api)

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+aws-sdk-bedrockruntime = "1.125.0"
 axum = "0.8.8"
 handlers = { git = "https://github.com/llm-proxy-rs/cognito.git", version = "0.1.0" }
 myerrors = { path = "../myerrors" }

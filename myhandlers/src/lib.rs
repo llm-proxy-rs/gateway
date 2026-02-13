@@ -1,3 +1,4 @@
+use aws_sdk_bedrockruntime::Client;
 use axum::{
     extract::{Query, State},
     response::{IntoResponse, Redirect, Response},
@@ -12,6 +13,7 @@ use tower_sessions::Session;
 pub struct AppState {
     pub aws_account_id: String,
     pub aws_region: String,
+    pub bedrockruntime_client: Client,
     pub cognito_client_id: String,
     pub cognito_client_secret: String,
     pub cognito_domain: String,

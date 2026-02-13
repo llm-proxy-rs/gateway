@@ -84,8 +84,7 @@ pub async fn chat_completions(
 
     payload.model = model_name;
 
-    let stream = BedrockChatCompletionsProvider::new()
-        .await
+    let stream = BedrockChatCompletionsProvider::new(state.bedrockruntime_client.clone())
         .chat_completions_stream(
             payload,
             reasoning_effort_to_thinking_budget_tokens,
