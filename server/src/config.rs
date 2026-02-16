@@ -41,7 +41,7 @@ fn default_database_url() -> String {
 }
 
 fn default_inference_profile_prefixes() -> Vec<String> {
-    vec!["us.".to_string()]
+    vec!["global".to_string(), "us.".to_string()]
 }
 
 pub async fn load_config() -> anyhow::Result<AppConfig> {

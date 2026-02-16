@@ -24,6 +24,7 @@ use tracing::{error, info};
 
 use crate::config::load_config;
 use crate::database::setup_database;
+#[allow(unused_imports)]
 use crate::handlers::{
     add_model::{add_model_get, add_model_post},
     browse_models::{browse_models_get, browse_models_post},
@@ -100,10 +101,10 @@ async fn main() -> anyhow::Result<()> {
         .allow_origin(Any);
 
     let api = Router::new()
-        .route("/chat/completions", post(chat_completions))
+        //.route("/chat/completions", post(chat_completions))
         .route("/v1/messages", post(v1_messages))
         .route("/v1/messages/count_tokens", post(v1_messages_count_tokens))
-        .route("/models", get(models))
+        //.route("/models", get(models))
         .layer(cors_layer);
 
     let mut csrf_config = CsrfConfig::default().with_salt(app_config.csrf_salt);
@@ -129,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(index))
-        .route("/add-model", get(add_model_get).post(add_model_post))
+        //.route("/add-model", get(add_model_get).post(add_model_post))
         .route(
             "/browse-models",
             get(browse_models_get).post(browse_models_post),

@@ -12,11 +12,13 @@ use crate::csrf::{get_authenticity_token, verify_authenticity_token};
 use crate::templates::common::{common_styles, nav_menu};
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct AddModelForm {
     pub authenticity_token: String,
     pub model_name: String,
 }
 
+#[allow(dead_code)]
 pub async fn add_model_get(token: CsrfToken, session: Session) -> Result<Response, AppError> {
     let _email = match session.get::<String>("email").await? {
         Some(email) => email,
@@ -54,6 +56,7 @@ pub async fn add_model_get(token: CsrfToken, session: Session) -> Result<Respons
     Ok((token, Html(html)).into_response())
 }
 
+#[allow(dead_code)]
 pub async fn add_model_post(
     token: CsrfToken,
     session: Session,

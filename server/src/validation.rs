@@ -50,6 +50,7 @@ pub async fn check_api_key_exists_and_model_exists_and_get_inference_profile_arn
     ))
 }
 
+#[allow(dead_code)]
 pub async fn check_api_key_exists(pool: &PgPool, api_key: &str) -> anyhow::Result<bool> {
     let result = sqlx::query_scalar!(
         r#"

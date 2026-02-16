@@ -15,4 +15,11 @@ cognito_client_secret = "your_cognito_client_secret"
 cognito_region = "us-east-1"
 cognito_user_pool_id = "us-east-1_xxxxxxxx"
 cognito_redirect_uri = "http://localhost:3000/callback"
-cognito_domain = "your-domain.auth.us-east-1.amazoncognito.com" 
+cognito_domain = "your-domain.auth.us-east-1.amazoncognito.com"
+
+# CSRF Protection (use long random strings in production)
+csrf_cookie_key = "your_csrf_cookie_key"
+csrf_salt = "your_csrf_salt"
+
+# Inference profile prefixes (optional; default: ["global", "us."])
+# inference_profile_prefixes = ["global", "us."]
