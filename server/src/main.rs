@@ -24,6 +24,7 @@ use tracing::{error, info};
 
 use crate::config::load_config;
 use crate::database::setup_database;
+#[allow(unused_imports)]
 use crate::handlers::{
     add_model::{add_model_get, add_model_post},
     browse_models::{browse_models_get, browse_models_post},

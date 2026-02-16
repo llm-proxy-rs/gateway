@@ -15,7 +15,7 @@ axum_csrf = { version = "0.11.0", features = ["layer"] }
 chat = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 config = "0.15.19"
 dotenv = "0.15.0"
-futures = "0.3.31"
+futures = "0.3.32"
 http = "1.4.0"
 inference_profiles = { path = "../inference_profiles" }
 models = { path = "../models" }
@@ -25,7 +25,7 @@ request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = 
 reqwest = "0.13.2"
 response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 serde = "1.0.228"
-sqlx = { version = "0.8.6", features = ["postgres"] }
+sqlx = { version = "0.8.6", features = ["postgres", "tls-rustls"] }
 time = "0.3.47"
 tokio = { version = "1.49.0", features = ["full"] }
 tower-http = { version = "0.6.8", features = ["cors"] }

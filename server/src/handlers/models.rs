@@ -7,6 +7,7 @@ use myhandlers::AppState;
 
 use crate::validation::check_api_key_exists;
 
+#[allow(dead_code)]
 pub async fn models(
     headers: HeaderMap,
     State(state): State<AppState>,
