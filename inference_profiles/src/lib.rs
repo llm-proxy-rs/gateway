@@ -1,5 +1,5 @@
 use anyhow::Result;
-use aws_sdk_bedrock::types::InferenceProfileModelSource;
+use aws_sdk_bedrock::types::{InferenceProfileModelSource, Tag};
 use sqlx::PgPool;
 use tracing::{error, info};
 use uuid::Uuid;
@@ -26,10 +26,41 @@ pub async fn create_inference_profile(
 
     let inference_profile_name = Uuid::new_v4().to_string();
 
+    let ids = sqlx::query!(
+        r#"
+        SELECT
+            (SELECT user_id FROM api_keys WHERE api_key = $1) AS user_id,
+            (SELECT model_id FROM models WHERE model_name = $2 AND is_disabled = FALSE) AS model_id
+        "#,
+        api_key.to_lowercase(),
+        model_name.to_lowercase(),
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let user_id = ids
+        .user_id
+        .ok_or_else(|| anyhow::anyhow!("API key not found: {}", api_key))?;
+    let model_id = ids
+        .model_id
+        .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_name))?;
+
     let response = client
         .create_inference_profile()
         .inference_profile_name(&inference_profile_name)
         .model_source(InferenceProfileModelSource::CopyFrom(copy_from))
+        .tags(
+            Tag::builder()
+                .key("GatewayUserId")
+                .value(user_id.to_string())
+                .build()?,
+        )
+        .tags(
+            Tag::builder()
+                .key("GatewayModelId")
+                .value(model_id.to_string())
+                .build()?,
+        )
         .send()
         .await
         .map_err(|e| {

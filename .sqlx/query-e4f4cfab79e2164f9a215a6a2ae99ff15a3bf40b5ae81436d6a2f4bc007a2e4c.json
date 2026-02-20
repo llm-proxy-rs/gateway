@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            (SELECT user_id FROM api_keys WHERE api_key = $1) AS user_id,\n            (SELECT model_id FROM models WHERE model_name = $2 AND is_disabled = FALSE) AS model_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "model_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "e4f4cfab79e2164f9a215a6a2ae99ff15a3bf40b5ae81436d6a2f4bc007a2e4c"
+}
