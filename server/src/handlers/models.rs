@@ -1,7 +1,7 @@
 use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{Json, extract::State, http::HeaderMap, response::IntoResponse};
-use models::{get_models, to_models_response};
+use models::{get_enabled_model_names, to_models_response};
 use myerrors::AppError;
 use myhandlers::AppState;
 
@@ -24,9 +24,9 @@ pub async fn models(
         )));
     }
 
-    let models = get_models(&state.db_pool).await?;
+    let model_names = get_enabled_model_names(&state.db_pool).await?;
 
-    let models_response = to_models_response(&models);
+    let models_response = to_models_response(&model_names);
 
     Ok(Json(models_response).into_response())
 }

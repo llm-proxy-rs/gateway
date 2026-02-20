@@ -5,6 +5,7 @@ use sqlx::PgPool;
 pub struct Model {
     pub model_name: String,
     pub protected: bool,
+    pub is_disabled: bool,
 }
 
 #[derive(Serialize)]
@@ -27,8 +28,10 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
         r#"
         SELECT
             model_name,
-            protected
+            protected,
+            is_disabled
         FROM models
+        WHERE NOT (protected = TRUE AND is_disabled = TRUE)
         ORDER BY model_name
         "#
     )
@@ -38,11 +41,56 @@ pub async fn get_models(pool: &PgPool) -> anyhow::Result<Vec<Model>> {
     Ok(models)
 }
 
+pub async fn get_enabled_model_names(pool: &PgPool) -> anyhow::Result<Vec<String>> {
+    let names = sqlx::query_scalar!(
+        r#"
+        SELECT model_name
+        FROM models
+        WHERE is_disabled = FALSE
+        ORDER BY model_name
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(names)
+}
+
 pub async fn create_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()> {
     sqlx::query!(
         r#"
         INSERT INTO models (model_name)
         VALUES ($1)
+        "#,
+        model_name.to_lowercase()
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn disable_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()> {
+    sqlx::query!(
+        r#"
+        UPDATE models
+        SET is_disabled = TRUE, updated_at = now()
+        WHERE model_name = $1 AND protected = FALSE
+        "#,
+        model_name.to_lowercase()
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn enable_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()> {
+    sqlx::query!(
+        r#"
+        UPDATE models
+        SET is_disabled = FALSE, updated_at = now()
+        WHERE model_name = $1 AND protected = FALSE
         "#,
         model_name.to_lowercase()
     )
@@ -66,12 +114,12 @@ pub async fn delete_model(pool: &PgPool, model_name: &str) -> anyhow::Result<()>
     Ok(())
 }
 
-pub fn to_models_response(models: &[Model]) -> ModelsResponse {
-    let data = models
+pub fn to_models_response(model_names: &[String]) -> ModelsResponse {
+    let data = model_names
         .iter()
-        .map(|model| Data {
+        .map(|model_name| Data {
             created: 0,
-            id: model.model_name.clone(),
+            id: model_name.clone(),
             object: "model".to_string(),
             owned_by: "".to_string(),
         })

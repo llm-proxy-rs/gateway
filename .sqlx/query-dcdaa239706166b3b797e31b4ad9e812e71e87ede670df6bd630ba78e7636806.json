@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT model_name\n        FROM models\n        WHERE is_disabled = FALSE\n        ORDER BY model_name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "dcdaa239706166b3b797e31b4ad9e812e71e87ede670df6bd630ba78e7636806"
+}

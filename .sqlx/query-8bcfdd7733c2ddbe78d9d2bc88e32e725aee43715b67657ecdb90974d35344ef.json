@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            model_name,\n            protected,\n            is_disabled\n        FROM models\n        WHERE NOT (protected = TRUE AND is_disabled = TRUE)\n        ORDER BY model_name\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "model_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "protected",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "is_disabled",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8bcfdd7733c2ddbe78d9d2bc88e32e725aee43715b67657ecdb90974d35344ef"
+}
