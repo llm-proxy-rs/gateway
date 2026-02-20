@@ -48,6 +48,7 @@ pub async fn create_inference_profile(
         SELECT ak.user_id, m.model_id, $3, $4
         FROM api_keys ak, models m
         WHERE ak.api_key = $1 AND m.model_name = $2 AND m.is_disabled = FALSE
+        ON CONFLICT (user_id, model_id) DO NOTHING
         "#,
         api_key.to_lowercase(),
         model_name.to_lowercase(),
