@@ -12,12 +12,14 @@ use tower_sessions::Session;
 use crate::csrf::verify_authenticity_token;
 use crate::templates::common::{common_styles, nav_menu};
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct DisableModelForm {
     pub authenticity_token: String,
     pub model_name: String,
 }
 
+#[allow(dead_code)]
 pub async fn disable_model_post(
     token: CsrfToken,
     session: Session,
