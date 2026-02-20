@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE models\n        SET is_disabled = TRUE, updated_at = now()\n        WHERE model_name = $1 AND protected = FALSE\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2c46c4e887000a890ef8dffe02a284c636df9742e1d18b5c6184eefc0beab4a9"
+}

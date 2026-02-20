@@ -47,7 +47,7 @@ pub async fn create_inference_profile(
         INSERT INTO inference_profiles (user_id, model_id, inference_profile_arn, inference_profile_name)
         SELECT ak.user_id, m.model_id, $3, $4
         FROM api_keys ak, models m
-        WHERE ak.api_key = $1 AND m.model_name = $2
+        WHERE ak.api_key = $1 AND m.model_name = $2 AND m.is_disabled = FALSE
         "#,
         api_key.to_lowercase(),
         model_name.to_lowercase(),
