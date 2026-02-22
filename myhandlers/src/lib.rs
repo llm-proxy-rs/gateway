@@ -11,6 +11,7 @@ use tower_sessions::Session;
 
 #[derive(Clone)]
 pub struct AppState {
+    pub anthropic_beta_whitelist: Vec<String>,
     pub aws_account_id: String,
     pub aws_region: String,
     pub bedrockruntime_client: Client,

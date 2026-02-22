@@ -6,7 +6,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, sse::Sse},
 };
-use chat::bedrock::ReasoningEffortToThinkingBudgetTokens;
 use chat::provider::{BedrockChatCompletionsProvider, ChatCompletionsProvider};
 use inference_profiles::create_inference_profile;
 use myerrors::AppError;
@@ -80,17 +79,10 @@ pub async fn chat_completions(
 
     let usage_callback = create_usage_callback(&model_name);
 
-    let reasoning_effort_to_thinking_budget_tokens =
-        ReasoningEffortToThinkingBudgetTokens::default();
-
     payload.model = model_name;
 
     let stream = BedrockChatCompletionsProvider::new(state.bedrockruntime_client.clone())
-        .chat_completions_stream(
-            payload,
-            reasoning_effort_to_thinking_budget_tokens,
-            usage_callback,
-        )
+        .chat_completions_stream(payload, usage_callback)
         .await?;
 
     Ok((StatusCode::OK, Sse::new(stream)))

@@ -3,6 +3,8 @@ use serde::Deserialize;
 
 #[derive(Clone, Deserialize)]
 pub struct AppConfig {
+    #[serde(default = "default_anthropic_beta_whitelist")]
+    pub anthropic_beta_whitelist: Vec<String>,
     pub aws_account_id: String,
     #[serde(default = "default_aws_region")]
     pub aws_region: String,
@@ -22,6 +24,17 @@ pub struct AppConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+}
+
+fn default_anthropic_beta_whitelist() -> Vec<String> {
+    vec![
+        "adaptive-thinking-2026-01-28".to_string(),
+        "claude-code-20250219".to_string(),
+        "context-1m-2025-08-07".to_string(),
+        "effort-2025-11-24".to_string(),
+        "interleaved-thinking-2025-05-14".to_string(),
+        "structured-outputs-2025-12-15".to_string(),
+    ]
 }
 
 fn default_aws_region() -> String {

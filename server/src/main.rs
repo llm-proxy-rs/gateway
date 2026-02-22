@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
     info!("AWS Bedrock Runtime client initialized");
 
     let app_state = AppState {
+        anthropic_beta_whitelist: app_config.anthropic_beta_whitelist,
         aws_account_id: app_config.aws_account_id,
         aws_region: app_config.aws_region,
         bedrockruntime_client,
