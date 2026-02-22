@@ -8,11 +8,12 @@ use axum::{
     response::sse::Sse,
 };
 use chat::provider::{BedrockV1MessagesProvider, V1MessagesProvider};
+use common::filter_anthropic_beta;
 use futures::Stream;
 use inference_profiles::create_inference_profile;
 use myerrors::AppError;
 use myhandlers::AppState;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::{
     handlers::usage_callback::create_usage_callback,
@@ -82,10 +83,20 @@ pub async fn v1_messages(
 
     let usage_callback = create_usage_callback(&model_name);
 
+    let anthropic_beta = filter_anthropic_beta(&headers, &state.anthropic_beta_whitelist);
+    info!("anthropic_beta: {:?}", anthropic_beta);
+
+    let response_model_id = payload.model.clone();
+
     payload.model = model_name;
 
     let stream = BedrockV1MessagesProvider::new(state.bedrockruntime_client.clone())
-        .v1_messages_stream(payload, None, usage_callback)
+        .v1_messages_stream(
+            payload,
+            Some(response_model_id),
+            anthropic_beta,
+            usage_callback,
+        )
         .await?;
 
     Ok((StatusCode::OK, Sse::new(stream)))

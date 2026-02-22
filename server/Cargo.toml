@@ -13,6 +13,7 @@ aws-sdk-bedrockruntime = "1.126.0"
 axum = "0.8.8"
 axum_csrf = { version = "0.11.0", features = ["layer"] }
 chat = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
+common = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 config = "0.15.19"
 dotenv = "0.15.0"
 futures = "0.3.32"
