@@ -23,3 +23,24 @@ csrf_salt = "your_csrf_salt"
 
 # Inference profile prefixes (optional; default: ["global", "us."])
 # inference_profile_prefixes = ["global", "us."]
+
+# Model Mapping (Anthropic model ID -> Bedrock model ID)
+[[models]]
+anthropic_model_id = "claude-opus-4-6"
+anthropic_display_name = "Claude Opus 4.6"
+bedrock_model_id = "us.anthropic.claude-opus-4-6-v1"
+
+[[models]]
+anthropic_model_id = "claude-sonnet-4-6"
+anthropic_display_name = "Claude Sonnet 4.6"
+bedrock_model_id = "us.anthropic.claude-sonnet-4-6"
+
+[[models]]
+anthropic_model_id = "claude-haiku-4-5-20251001"
+anthropic_display_name = "Claude Haiku 4.5"
+bedrock_model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+[[models]]
+anthropic_model_id = "claude-3-haiku-20240307"
+anthropic_display_name = "Claude Haiku 3"
+bedrock_model_id = "us.anthropic.claude-3-haiku-20240307-v1:0"

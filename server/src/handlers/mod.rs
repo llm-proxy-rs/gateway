@@ -12,3 +12,4 @@ pub mod models;
 pub mod usage_callback;
 pub mod v1_messages;
 pub mod v1_messages_count_tokens;
+pub mod v1_models;

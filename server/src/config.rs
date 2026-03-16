@@ -1,4 +1,5 @@
 use config::{Config, Environment, File};
+use myhandlers::ModelConfig;
 use serde::Deserialize;
 
 #[derive(Clone, Deserialize)]
@@ -24,6 +25,8 @@ pub struct AppConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+    #[serde(default)]
+    pub models: Vec<ModelConfig>,
 }
 
 fn default_anthropic_beta_whitelist() -> Vec<String> {

@@ -10,7 +10,7 @@ use axum::{
 };
 use chat::provider::{BedrockV1MessagesProvider, V1MessagesProvider};
 use myerrors::AppError;
-use myhandlers::AppState;
+use myhandlers::{AppState, get_bedrock_model_id};
 use tracing::{error, info};
 
 use crate::validation::check_api_key_exists_and_model_exists;
@@ -28,6 +28,8 @@ pub async fn v1_messages_count_tokens(
     let api_key = get_api_key(&headers)
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+
+    payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
 
     let (api_key_exists, model_exists) =
         check_api_key_exists_and_model_exists(&state.db_pool, &api_key, &payload.model).await?;

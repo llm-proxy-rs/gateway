@@ -6,7 +6,9 @@ edition = "2024"
 [dependencies]
 aws-sdk-bedrockruntime = "1.126.0"
 axum = "0.8.8"
+chrono = { version = "0.4.0", features = ["serde"] }
 handlers = { git = "https://github.com/llm-proxy-rs/cognito.git", version = "0.1.0" }
 myerrors = { path = "../myerrors" }
+serde = { version = "1.0.0", features = ["derive"] }
 sqlx = { version = "0.8.6", features = ["postgres"] }
 tower-sessions = "0.15.0"

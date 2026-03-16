@@ -12,7 +12,7 @@ use common::filter_anthropic_beta;
 use futures::Stream;
 use inference_profiles::create_inference_profile;
 use myerrors::AppError;
-use myhandlers::AppState;
+use myhandlers::{AppState, get_bedrock_model_id};
 use tracing::{debug, error, info};
 
 use crate::{
@@ -36,6 +36,9 @@ pub async fn v1_messages(
     let api_key = get_api_key(&headers)
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+
+    let response_model_id = payload.model.clone();
+    payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
 
     let (api_key_exists, model_exists, inference_profile_arn) =
         check_api_key_exists_and_model_exists_and_get_inference_profile_arn(
@@ -85,8 +88,6 @@ pub async fn v1_messages(
 
     let anthropic_beta = filter_anthropic_beta(&headers, &state.anthropic_beta_whitelist);
     info!("anthropic_beta: {:?}", anthropic_beta);
-
-    let response_model_id = payload.model.clone();
 
     payload.model = model_name;
 
