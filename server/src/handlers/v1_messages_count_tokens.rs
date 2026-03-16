@@ -25,11 +25,11 @@ pub async fn v1_messages_count_tokens(
         payload.model
     );
 
-    payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
-
     let api_key = get_api_key(&headers)
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+
+    payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
 
     let (api_key_exists, model_exists) =
         check_api_key_exists_and_model_exists(&state.db_pool, &api_key, &payload.model).await?;
