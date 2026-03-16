@@ -13,7 +13,7 @@ use axum::{
 use axum_csrf::{CsrfConfig, CsrfLayer, Key};
 use dotenv::dotenv;
 use http::header::{AUTHORIZATION, CONTENT_TYPE, HeaderName};
-use myhandlers::{AppState, ModelMapping, callback, login, logout};
+use myhandlers::{AppState, callback, login, logout};
 use std::sync::Arc;
 use tokio::signal;
 use tokio::task::AbortHandle;
@@ -33,7 +33,7 @@ use crate::handlers::{
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     health::health,
     index::index,
-    models::v1_models,
+    v1_models::v1_models,
     v1_messages::v1_messages,
     v1_messages_count_tokens::v1_messages_count_tokens,
 };
@@ -65,11 +65,16 @@ async fn main() -> anyhow::Result<()> {
     let bedrockruntime_client = Client::new(&aws_config);
     info!("AWS Bedrock Runtime client initialized");
 
-    let model_mapping = ModelMapping::new(app_config.models);
-    info!("Loaded {} model mappings", model_mapping.get_model_configs().len());
+    let anthropic_to_bedrock: std::collections::HashMap<String, String> = app_config
+        .models
+        .iter()
+        .map(|m| (m.anthropic_model_id.clone(), m.bedrock_model_id.clone()))
+        .collect();
+    info!("Loaded {} model mappings", anthropic_to_bedrock.len());
 
     let app_state = AppState {
         anthropic_beta_whitelist: app_config.anthropic_beta_whitelist,
+        anthropic_to_bedrock,
         aws_account_id: app_config.aws_account_id,
         aws_region: app_config.aws_region,
         bedrockruntime_client,
@@ -81,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
         cognito_user_pool_id: app_config.cognito_user_pool_id,
         db_pool: Arc::new(db_pool.clone()),
         inference_profile_prefixes: app_config.inference_profile_prefixes,
-        model_mapping,
+        model_configs: app_config.models,
     };
 
     let session_store = PostgresStore::new(db_pool);

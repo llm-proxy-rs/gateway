@@ -12,7 +12,7 @@ use common::filter_anthropic_beta;
 use futures::Stream;
 use inference_profiles::create_inference_profile;
 use myerrors::AppError;
-use myhandlers::AppState;
+use myhandlers::{AppState, get_bedrock_model_id};
 use tracing::{debug, error, info};
 
 use crate::{
@@ -34,7 +34,7 @@ pub async fn v1_messages(
     debug!("Received v1/messages request for model: {}", payload.model);
 
     let response_model_id = payload.model.clone();
-    payload.model = state.model_mapping.get_bedrock_model_id(&payload.model);
+    payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
 
     let api_key = get_api_key(&headers)
         .await

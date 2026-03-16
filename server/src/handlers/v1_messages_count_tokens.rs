@@ -10,7 +10,7 @@ use axum::{
 };
 use chat::provider::{BedrockV1MessagesProvider, V1MessagesProvider};
 use myerrors::AppError;
-use myhandlers::AppState;
+use myhandlers::{AppState, get_bedrock_model_id};
 use tracing::{error, info};
 
 use crate::validation::check_api_key_exists_and_model_exists;
@@ -25,7 +25,7 @@ pub async fn v1_messages_count_tokens(
         payload.model
     );
 
-    payload.model = state.model_mapping.get_bedrock_model_id(&payload.model);
+    payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
 
     let api_key = get_api_key(&headers)
         .await
