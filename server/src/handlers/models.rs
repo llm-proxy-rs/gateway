@@ -1,0 +1,32 @@
+use anyhow::Context;
+use apikeys::get_api_key;
+use axum::{Json, extract::State, http::HeaderMap, response::IntoResponse};
+use models::{get_enabled_model_names, to_models_response};
+use myerrors::AppError;
+use myhandlers::AppState;
+
+use crate::validation::check_api_key_exists;
+
+#[allow(dead_code)]
+pub async fn models(
+    headers: HeaderMap,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
+    let api_key = get_api_key(&headers)
+        .await
+        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+
+    let api_key_exists = check_api_key_exists(&state.db_pool, &api_key).await?;
+
+    if !api_key_exists {
+        return Err(AppError::from(anyhow::anyhow!(
+            "Invalid or missing API key"
+        )));
+    }
+
+    let model_names = get_enabled_model_names(&state.db_pool).await?;
+
+    let models_response = to_models_response(&model_names);
+
+    Ok(Json(models_response).into_response())
+}
