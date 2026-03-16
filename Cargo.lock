@@ -2080,8 +2080,10 @@ version = "0.1.0"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "axum",
+ "chrono",
  "handlers",
  "myerrors",
+ "serde",
  "sqlx",
  "tower-sessions",
 ]
@@ -3049,6 +3051,7 @@ dependencies = [
  "axum",
  "axum_csrf",
  "chat",
+ "chrono",
  "common",
  "config",
  "dotenv",

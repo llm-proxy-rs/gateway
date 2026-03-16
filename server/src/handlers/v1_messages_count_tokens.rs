@@ -25,6 +25,8 @@ pub async fn v1_messages_count_tokens(
         payload.model
     );
 
+    payload.model = state.model_mapping.get_bedrock_model_id(&payload.model);
+
     let api_key = get_api_key(&headers)
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;

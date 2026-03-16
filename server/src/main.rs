@@ -13,7 +13,7 @@ use axum::{
 use axum_csrf::{CsrfConfig, CsrfLayer, Key};
 use dotenv::dotenv;
 use http::header::{AUTHORIZATION, CONTENT_TYPE, HeaderName};
-use myhandlers::{AppState, callback, login, logout};
+use myhandlers::{AppState, ModelMapping, callback, login, logout};
 use std::sync::Arc;
 use tokio::signal;
 use tokio::task::AbortHandle;
@@ -33,7 +33,7 @@ use crate::handlers::{
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     health::health,
     index::index,
-    models::models,
+    models::v1_models,
     v1_messages::v1_messages,
     v1_messages_count_tokens::v1_messages_count_tokens,
 };
@@ -65,6 +65,9 @@ async fn main() -> anyhow::Result<()> {
     let bedrockruntime_client = Client::new(&aws_config);
     info!("AWS Bedrock Runtime client initialized");
 
+    let model_mapping = ModelMapping::new(app_config.models);
+    info!("Loaded {} model mappings", model_mapping.get_model_configs().len());
+
     let app_state = AppState {
         anthropic_beta_whitelist: app_config.anthropic_beta_whitelist,
         aws_account_id: app_config.aws_account_id,
@@ -78,6 +81,7 @@ async fn main() -> anyhow::Result<()> {
         cognito_user_pool_id: app_config.cognito_user_pool_id,
         db_pool: Arc::new(db_pool.clone()),
         inference_profile_prefixes: app_config.inference_profile_prefixes,
+        model_mapping,
     };
 
     let session_store = PostgresStore::new(db_pool);
@@ -105,6 +109,7 @@ async fn main() -> anyhow::Result<()> {
         //.route("/chat/completions", post(chat_completions))
         .route("/v1/messages", post(v1_messages))
         .route("/v1/messages/count_tokens", post(v1_messages_count_tokens))
+        .route("/v1/models", get(v1_models))
         //.route("/models", get(models))
         .layer(cors_layer);
 

@@ -1,32 +1,67 @@
-use anyhow::Context;
-use apikeys::get_api_key;
-use axum::{Json, extract::State, http::HeaderMap, response::IntoResponse};
-use models::{get_enabled_model_names, to_models_response};
-use myerrors::AppError;
-use myhandlers::AppState;
+use axum::{
+    Json,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use chrono::DateTime;
+use myhandlers::{AppState, ModelInfo, ModelsResponse};
+use serde::Deserialize;
 
-use crate::validation::check_api_key_exists;
+#[derive(Deserialize)]
+pub struct ModelsQuery {
+    pub limit: Option<usize>,
+    pub after_id: Option<String>,
+    pub before_id: Option<String>,
+}
 
-#[allow(dead_code)]
-pub async fn models(
-    headers: HeaderMap,
+pub async fn v1_models(
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let api_key = get_api_key(&headers)
-        .await
-        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+    Query(models_query): Query<ModelsQuery>,
+) -> impl IntoResponse {
+    let limit = models_query.limit.unwrap_or(20).min(1000);
 
-    let api_key_exists = check_api_key_exists(&state.db_pool, &api_key).await?;
+    let model_infos: Vec<ModelInfo> = state
+        .model_mapping
+        .get_model_configs()
+        .iter()
+        .map(|model_config| ModelInfo {
+            id: model_config.anthropic_model_id.clone(),
+            display_name: model_config.anthropic_display_name.clone(),
+            created_at: DateTime::UNIX_EPOCH,
+            model_type: "model".to_string(),
+        })
+        .collect();
 
-    if !api_key_exists {
-        return Err(AppError::from(anyhow::anyhow!(
-            "Invalid or missing API key"
-        )));
+    let mut start = 0;
+    let mut end = model_infos.len();
+
+    if let Some(ref after_id) = models_query.after_id {
+        if let Some(idx) = model_infos.iter().position(|model_info| model_info.id == *after_id) {
+            start = idx + 1;
+        }
+    }
+    if let Some(ref before_id) = models_query.before_id {
+        if let Some(idx) = model_infos.iter().position(|model_info| model_info.id == *before_id) {
+            end = idx;
+        }
     }
 
-    let model_names = get_enabled_model_names(&state.db_pool).await?;
+    let filtered_model_infos = if start < end {
+        &model_infos[start..end]
+    } else {
+        &[]
+    };
 
-    let models_response = to_models_response(&model_names);
+    let page = &filtered_model_infos[..filtered_model_infos.len().min(limit)];
+    let has_more = filtered_model_infos.len() > limit;
 
-    Ok(Json(models_response).into_response())
+    let models_response = ModelsResponse {
+        first_id: page.first().map(|model_info| model_info.id.clone()),
+        last_id: page.last().map(|model_info| model_info.id.clone()),
+        has_more,
+        data: page.to_vec(),
+    };
+
+    (StatusCode::OK, Json(models_response))
 }

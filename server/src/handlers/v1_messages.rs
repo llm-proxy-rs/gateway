@@ -33,6 +33,9 @@ pub async fn v1_messages(
 > {
     debug!("Received v1/messages request for model: {}", payload.model);
 
+    let response_model_id = payload.model.clone();
+    payload.model = state.model_mapping.get_bedrock_model_id(&payload.model);
+
     let api_key = get_api_key(&headers)
         .await
         .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
@@ -85,8 +88,6 @@ pub async fn v1_messages(
 
     let anthropic_beta = filter_anthropic_beta(&headers, &state.anthropic_beta_whitelist);
     info!("anthropic_beta: {:?}", anthropic_beta);
-
-    let response_model_id = payload.model.clone();
 
     payload.model = model_name;
 
