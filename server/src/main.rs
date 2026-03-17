@@ -14,6 +14,7 @@ use axum_csrf::{CsrfConfig, CsrfLayer, Key};
 use dotenv::dotenv;
 use http::header::{AUTHORIZATION, CONTENT_TYPE, HeaderName};
 use myhandlers::{AppState, callback, login, logout};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::task::AbortHandle;
@@ -33,9 +34,9 @@ use crate::handlers::{
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     health::health,
     index::index,
-    v1_models::v1_models,
     v1_messages::v1_messages,
     v1_messages_count_tokens::v1_messages_count_tokens,
+    v1_models::v1_models,
 };
 
 #[tokio::main]
@@ -65,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
     let bedrockruntime_client = Client::new(&aws_config);
     info!("AWS Bedrock Runtime client initialized");
 
-    let anthropic_to_bedrock: std::collections::HashMap<String, String> = app_config
+    let anthropic_to_bedrock: HashMap<String, String> = app_config
         .models
         .iter()
         .map(|m| (m.anthropic_model_id.clone(), m.bedrock_model_id.clone()))
