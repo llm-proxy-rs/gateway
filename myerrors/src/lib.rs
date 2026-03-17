@@ -7,6 +7,12 @@ use axum::{http::StatusCode, response::IntoResponse};
 
 pub struct AppError(StatusCode, String);
 
+impl AppError {
+    pub fn new(status: StatusCode, message: impl Into<String>) -> Self {
+        Self(status, message.into())
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         (self.0, self.1).into_response()
@@ -40,7 +46,10 @@ where
                     .and_then(|se| se.meta().message())
             })
             .map(String::from)
-            .unwrap_or_else(|| err.to_string());
+            .unwrap_or_else(|| {
+                tracing::error!("internal error: {err:#}");
+                "Internal server error".to_string()
+            });
         Self(status, message)
     }
 }
@@ -60,7 +69,7 @@ mod tests {
     fn generic_error_defaults_to_500() {
         let app_error = AppError::from(anyhow::anyhow!("API key not found"));
         assert_eq!(app_error.0, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(app_error.1, "API key not found");
+        assert_eq!(app_error.1, "Internal server error");
     }
 
     #[tokio::test]

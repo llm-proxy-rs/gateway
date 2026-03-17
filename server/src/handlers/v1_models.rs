@@ -1,4 +1,3 @@
-use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json,
@@ -19,33 +18,34 @@ pub async fn v1_models(
 ) -> Result<impl IntoResponse, AppError> {
     let api_key = get_api_key(&headers)
         .await
-        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+        .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "Invalid or missing API key"))?;
 
     let api_key_exists = check_api_key_exists(&state.db_pool, &api_key).await?;
 
     if !api_key_exists {
         error!("API key validation failed: Invalid API key");
-        return Err(AppError::from(anyhow::anyhow!(
-            "Invalid or missing API key"
-        )));
+        return Err(AppError::new(
+            StatusCode::UNAUTHORIZED,
+            "Invalid or missing API key",
+        ));
     }
 
-    let data: Vec<ModelInfo> = state
+    let model_infos: Vec<ModelInfo> = state
         .model_configs
         .iter()
         .map(|model_config| ModelInfo {
             id: model_config.anthropic_model_id.clone(),
             display_name: model_config.anthropic_display_name.clone(),
             created_at: DateTime::UNIX_EPOCH,
-            model_type: "model".to_string(),
+            type_: "model".to_string(),
         })
         .collect();
 
     let models_response = ModelsResponse {
-        first_id: data.first().map(|m| m.id.clone()),
-        last_id: data.last().map(|m| m.id.clone()),
+        first_id: model_infos.first().map(|m| m.id.clone()),
+        last_id: model_infos.last().map(|m| m.id.clone()),
         has_more: false,
-        data,
+        data: model_infos,
     };
 
     Ok((StatusCode::OK, Json(models_response)))

@@ -1,5 +1,4 @@
 use anthropic_request::V1MessagesRequest;
-use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json,
@@ -35,7 +34,7 @@ pub async fn v1_messages(
 
     let api_key = get_api_key(&headers)
         .await
-        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+        .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "Invalid or missing API key"))?;
 
     let response_model_id = payload.model.clone();
     payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
@@ -50,9 +49,10 @@ pub async fn v1_messages(
 
     if !api_key_exists {
         error!("API key validation failed: Invalid API key");
-        return Err(AppError::from(anyhow::anyhow!(
-            "Invalid or missing API key"
-        )));
+        return Err(AppError::new(
+            StatusCode::UNAUTHORIZED,
+            "Invalid or missing API key",
+        ));
     }
 
     if !model_exists {

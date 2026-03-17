@@ -40,7 +40,7 @@ pub struct ModelInfo {
     pub display_name: String,
     pub created_at: DateTime<Utc>,
     #[serde(rename = "type")]
-    pub model_type: String,
+    pub type_: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -110,8 +110,14 @@ mod tests {
 
     fn build_anthropic_to_bedrock() -> HashMap<String, String> {
         vec![
-            ("claude-opus-4-6".to_string(), "us.anthropic.claude-opus-4-6-v1".to_string()),
-            ("claude-sonnet-4-6".to_string(), "us.anthropic.claude-sonnet-4-6".to_string()),
+            (
+                "claude-opus-4-6".to_string(),
+                "us.anthropic.claude-opus-4-6-v1".to_string(),
+            ),
+            (
+                "claude-sonnet-4-6".to_string(),
+                "us.anthropic.claude-sonnet-4-6".to_string(),
+            ),
         ]
         .into_iter()
         .collect()
@@ -168,7 +174,13 @@ mod tests {
         let response_model_id = incoming_model.to_string();
         let bedrock_model_id = get_bedrock_model_id(&map, incoming_model);
 
-        assert_eq!(bedrock_model_id, "us.anthropic.claude-haiku-4-5-20251001-v1:0");
-        assert_eq!(response_model_id, "us.anthropic.claude-haiku-4-5-20251001-v1:0");
+        assert_eq!(
+            bedrock_model_id,
+            "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        );
+        assert_eq!(
+            response_model_id,
+            "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        );
     }
 }

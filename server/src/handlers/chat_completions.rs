@@ -1,4 +1,3 @@
-use anyhow::Context;
 use apikeys::get_api_key;
 use axum::{
     Json,
@@ -31,7 +30,7 @@ pub async fn chat_completions(
 
     let api_key = get_api_key(&headers)
         .await
-        .context("Missing API key (provide Authorization: Bearer <key> or x-api-key header)")?;
+        .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "Invalid or missing API key"))?;
 
     let (api_key_exists, model_exists, inference_profile_arn) =
         check_api_key_exists_and_model_exists_and_get_inference_profile_arn(
@@ -43,9 +42,10 @@ pub async fn chat_completions(
 
     if !api_key_exists {
         error!("API key validation failed: Invalid API key");
-        return Err(AppError::from(anyhow::anyhow!(
-            "Invalid or missing API key"
-        )));
+        return Err(AppError::new(
+            StatusCode::UNAUTHORIZED,
+            "Invalid or missing API key",
+        ));
     }
 
     if !model_exists {
