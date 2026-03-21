@@ -34,6 +34,7 @@ use crate::handlers::{
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     health::health,
     index::index,
+    provision_api_key::provision_api_key,
     v1_messages::v1_messages,
     v1_messages_count_tokens::v1_messages_count_tokens,
     v1_models::v1_models,
@@ -113,6 +114,7 @@ async fn main() -> anyhow::Result<()> {
 
     let api = Router::new()
         //.route("/chat/completions", post(chat_completions))
+        .route("/api/v1/api-key", post(provision_api_key))
         .route("/v1/messages", post(v1_messages))
         .route("/v1/messages/count_tokens", post(v1_messages_count_tokens))
         .route("/v1/models", get(v1_models))

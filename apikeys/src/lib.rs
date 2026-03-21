@@ -55,6 +55,24 @@ pub async fn get_api_keys_count_and_api_keys_count_active(
     Ok((result.api_keys_count, result.api_keys_count_active))
 }
 
+pub async fn get_active_api_key(pool: &PgPool, user_email: &str) -> Result<Option<String>> {
+    let result = sqlx::query_scalar(
+        r#"
+        SELECT api_key
+        FROM api_keys
+        WHERE user_id = (SELECT user_id FROM users WHERE user_email = $1)
+          AND is_disabled = false
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(user_email.to_lowercase())
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(result)
+}
+
 pub async fn get_api_key(headers: &HeaderMap) -> Option<String> {
     if let Some(token) = headers
         .get("Authorization")

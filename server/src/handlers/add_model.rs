@@ -95,9 +95,11 @@ pub async fn add_model_post(
             Ok(Html(html).into_response())
         }
         Err(e) => {
-            let error_message = if e.to_string().contains("duplicate key")
-                || e.to_string().contains("unique constraint")
-            {
+            let is_duplicate = e
+                .downcast_ref::<sqlx::Error>()
+                .and_then(|se| se.as_database_error())
+                .is_some_and(|de| de.is_unique_violation());
+            let error_message = if is_duplicate {
                 format!("Model \"{}\" already exists.", form.model_name)
             } else {
                 format!("Failed to add model: {}", e)
