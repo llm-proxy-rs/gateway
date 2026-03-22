@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT api_key\n        FROM api_keys\n        WHERE user_id = (SELECT user_id FROM users WHERE user_email = $1)\n          AND is_disabled = false\n        ORDER BY created_at DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "api_key",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7eb6fe479964058490e0aa8513eaa18321d9beda6e2f03d40efd85a0b58503ee"
+}

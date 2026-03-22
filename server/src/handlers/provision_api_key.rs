@@ -121,6 +121,7 @@ async fn validate_jwt_and_extract_email(token: &str, state: &AppState) -> anyhow
 
     // Cognito access tokens don't have aud claim, so skip client_id
     let validation = ValidationBuilder::new()
+        .client_id(&state.cognito_client_id)
         .region(&state.cognito_region)
         .user_pool_id(&state.cognito_user_pool_id)
         .build()?;
