@@ -9,6 +9,7 @@ pub mod generate_api_key;
 pub mod health;
 pub mod index;
 pub mod models;
+pub mod provision_api_key;
 pub mod usage_callback;
 pub mod v1_messages;
 pub mod v1_messages_count_tokens;
