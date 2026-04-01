@@ -21,8 +21,8 @@ cognito_domain = "your-domain.auth.us-east-1.amazoncognito.com"
 csrf_cookie_key = "your_csrf_cookie_key"
 csrf_salt = "your_csrf_salt"
 
-# Inference profile prefixes (optional; default: ["global", "us."])
-# inference_profile_prefixes = ["global", "us."]
+# Inference profile prefixes (optional; default: ["global.", "us."])
+# inference_profile_prefixes = ["global.", "us."]
 
 # Model Mapping (Anthropic model ID -> Bedrock model ID)
 [[models]]
