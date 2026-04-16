@@ -33,6 +33,7 @@ fn default_anthropic_beta_whitelist() -> Vec<String> {
     vec![
         "adaptive-thinking-2026-01-28".to_string(),
         "claude-code-20250219".to_string(),
+        "context-management-2025-06-27".to_string(),
         "context-1m-2025-08-07".to_string(),
         "effort-2025-11-24".to_string(),
         "interleaved-thinking-2025-05-14".to_string(),
