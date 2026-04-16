@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 aws-sdk-bedrockruntime = "1.129.0"
-axum = "0.8.8"
+axum = "0.8.9"
 chrono = { version = "0.4.44", features = ["serde"] }
 handlers = { git = "https://github.com/llm-proxy-rs/cognito.git", version = "0.1.0" }
 myerrors = { path = "../myerrors" }
