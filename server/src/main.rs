@@ -8,6 +8,7 @@ mod validation;
 use aws_sdk_bedrockruntime::Client;
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     routing::{get, post},
 };
 use axum_csrf::{CsrfConfig, CsrfLayer, Key};
@@ -119,7 +120,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/messages/count_tokens", post(v1_messages_count_tokens))
         .route("/v1/models", get(v1_models))
         //.route("/models", get(models))
-        .layer(cors_layer);
+        .layer(cors_layer)
+        .layer(DefaultBodyLimit::max(20 * 1024 * 1024)); // 20 MB
 
     let mut csrf_config = CsrfConfig::default().with_salt(app_config.csrf_salt);
 
