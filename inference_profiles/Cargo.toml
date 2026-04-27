@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
-aws-config = "1.8.15"
-aws-sdk-bedrock = "1.140.0"
+aws-config = "1.8.16"
+aws-sdk-bedrock = "1.141.0"
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio", "time", "uuid"] }
 tracing = "0.1.44"
 uuid = { version = "1.23.1", features = ["v4"] }
