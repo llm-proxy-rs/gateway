@@ -26,7 +26,7 @@ models = { path = "../models" }
 myerrors = { path = "../myerrors" }
 myhandlers = { path = "../myhandlers" }
 request = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
-reqwest = "0.13.2"
+reqwest = "0.13.3"
 validation = { git = "https://github.com/llm-proxy-rs/cognito.git" }
 response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }
 serde = { version = "1.0.228", features = ["derive"] }
