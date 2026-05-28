@@ -64,7 +64,7 @@ dependencies = [
 [[package]]
 name = "anthropic-request"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#5b8bd3d5212082e730c33beba3e70f277c08ac23"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#db6f420a152b0ab0cd3b11024ebf7d546d582344"
 dependencies = [
  "anyhow",
  "aws-sdk-bedrockruntime",
@@ -78,7 +78,7 @@ dependencies = [
 [[package]]
 name = "anthropic-response"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#5b8bd3d5212082e730c33beba3e70f277c08ac23"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#db6f420a152b0ab0cd3b11024ebf7d546d582344"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "serde",
@@ -449,7 +449,7 @@ dependencies = [
  "http 1.4.1",
  "http-body 0.4.6",
  "hyper 0.14.32",
- "hyper 1.9.0",
+ "hyper 1.10.0",
  "hyper-rustls 0.24.2",
  "hyper-rustls 0.27.9",
  "hyper-util",
@@ -623,7 +623,7 @@ dependencies = [
  "http 1.4.1",
  "http-body 1.0.1",
  "http-body-util",
- "hyper 1.9.0",
+ "hyper 1.10.0",
  "hyper-util",
  "itoa",
  "matchit",
@@ -792,7 +792,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "chat"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#5b8bd3d5212082e730c33beba3e70f277c08ac23"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#db6f420a152b0ab0cd3b11024ebf7d546d582344"
 dependencies = [
  "anthropic-request",
  "anthropic-response",
@@ -868,7 +868,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#5b8bd3d5212082e730c33beba3e70f277c08ac23"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#db6f420a152b0ab0cd3b11024ebf7d546d582344"
 dependencies = [
  "aws-smithy-types",
  "axum",
@@ -1137,9 +1137,9 @@ dependencies = [
 
 [[package]]
 name = "displaydoc"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
+checksum = "1ac70aa55017e108007fbaf5aa0f54b021c98f92ff8af59d42eda9da96e3dd4f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1711,9 +1711,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "1.9.0"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6299f016b246a94207e63da54dbe807655bf9e00044f73ded42c3ac5305fbcca"
+checksum = "eb92f162bf56536459fc83c79b974bb12837acfed43d6bc370a7916d0ae15ecc"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -1753,7 +1753,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ca68d021ef39cf6463ab54c1d0f5daf03377b70561305bb89a8f83aab66e0f"
 dependencies = [
  "http 1.4.1",
- "hyper 1.9.0",
+ "hyper 1.10.0",
  "hyper-util",
  "rustls 0.23.40",
  "rustls-native-certs",
@@ -1775,7 +1775,7 @@ dependencies = [
  "futures-util",
  "http 1.4.1",
  "http-body 1.0.1",
- "hyper 1.9.0",
+ "hyper 1.10.0",
  "ipnet",
  "libc",
  "percent-encoding",
@@ -2120,14 +2120,14 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libredox"
-version = "0.1.16"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e02f3bb43d335493c96bf3fd3a321600bf6bd07ed34bc64118e9293bdffea46c"
+checksum = "f02ab6bace2054fb888a3c16f990117b579d14a3088e472d63c6011fa185c9d3"
 dependencies = [
  "bitflags",
  "libc",
  "plain",
- "redox_syscall 0.7.5",
+ "redox_syscall 0.8.0",
 ]
 
 [[package]]
@@ -2718,9 +2718,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.7.5"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4666a1a60d8412eab19d94f6d13dcc9cea0a5ef4fdf6a5db306537413c661b1b"
+checksum = "7c7591fa2c6b601dfcfe5f043f65a1c39fcdf50efefcd7f1572e538c1f4b398d"
 dependencies = [
  "bitflags",
 ]
@@ -2763,7 +2763,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 [[package]]
 name = "request"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#5b8bd3d5212082e730c33beba3e70f277c08ac23"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#db6f420a152b0ab0cd3b11024ebf7d546d582344"
 dependencies = [
  "anyhow",
  "aws-sdk-bedrockruntime",
@@ -2786,7 +2786,7 @@ dependencies = [
  "http 1.4.1",
  "http-body 1.0.1",
  "http-body-util",
- "hyper 1.9.0",
+ "hyper 1.10.0",
  "hyper-rustls 0.27.9",
  "hyper-util",
  "js-sys",
@@ -2827,7 +2827,7 @@ dependencies = [
  "http 1.4.1",
  "http-body 1.0.1",
  "http-body-util",
- "hyper 1.9.0",
+ "hyper 1.10.0",
  "hyper-rustls 0.27.9",
  "hyper-util",
  "js-sys",
@@ -2875,7 +2875,7 @@ dependencies = [
 [[package]]
 name = "response"
 version = "0.1.0"
-source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#5b8bd3d5212082e730c33beba3e70f277c08ac23"
+source = "git+https://github.com/llm-proxy-rs/llm-proxy-rs.git#db6f420a152b0ab0cd3b11024ebf7d546d582344"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "serde",
@@ -4932,18 +4932,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.48"
+version = "0.8.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eed437bf9d6692032087e337407a86f04cd8d6a16a37199ed57949d415bd68e9"
+checksum = "bce33a6288fa3f072a8c2c7d0f2fdbb90e28298f0135c1f99b96c3db2efcc60b"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.48"
+version = "0.8.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70e3cd084b1788766f53af483dd21f93881ff30d7320490ec3ef7526d203bad4"
+checksum = "8fd425244944f4ab65ccff928e7323354c5a018c75838362fdce749dfad2ee1e"
 dependencies = [
  "proc-macro2",
  "quote",
