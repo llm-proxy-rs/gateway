@@ -9,7 +9,7 @@ anthropic-response = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git",
 anyhow = "1.0.102"
 apikeys = { path = "../apikeys" }
 aws-config = "1.8.17"
-aws-sdk-bedrockruntime = "1.131.0"
+aws-sdk-bedrockruntime = "1.132.0"
 axum = "0.8.9"
 axum_csrf = { version = "0.11.0", features = ["layer"] }
 chat = { git = "https://github.com/llm-proxy-rs/llm-proxy-rs.git", version = "0.1.0" }

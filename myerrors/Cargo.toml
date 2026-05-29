@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
-aws-sdk-bedrockruntime = "1.131.0"
+aws-sdk-bedrockruntime = "1.132.0"
 axum = "0.8.9"
 tracing = "0.1.44"
 
