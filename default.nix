@@ -1,6 +1,6 @@
 {pkgs ? import (import ./npins).nixpkgs {}}: let
   rustPackage = pkgs.rustPlatform.buildRustPackage {
-    cargoHash = "sha256-tCXw+bKXvHHIpyh/TMQMc6A8nX+16CKhLHA/O/4eEdk=";
+    cargoHash = "sha256-rNuIrnxeC99M39y8N9vuspem66sUC3bSwksxV0AX66E=";
     pname = "gateway";
     src = ./.;
     version = "0.1.0";
