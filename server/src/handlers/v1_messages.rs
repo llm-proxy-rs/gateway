@@ -4,11 +4,10 @@ use axum::{
     Json,
     extract::State,
     http::{HeaderMap, StatusCode},
-    response::sse::Sse,
+    response::{IntoResponse, sse::Sse},
 };
 use chat::provider::{BedrockV1MessagesProvider, V1MessagesProvider};
 use common::filter_anthropic_beta;
-use futures::Stream;
 use inference_profiles::create_inference_profile;
 use myerrors::AppError;
 use myhandlers::{AppState, get_bedrock_model_id};
@@ -23,13 +22,7 @@ pub async fn v1_messages(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(mut payload): Json<V1MessagesRequest>,
-) -> Result<
-    (
-        StatusCode,
-        Sse<impl Stream<Item = Result<axum::response::sse::Event, anyhow::Error>>>,
-    ),
-    AppError,
-> {
+) -> Result<impl IntoResponse, AppError> {
     debug!("Received v1/messages request for model: {}", payload.model);
 
     let api_key = get_api_key(&headers)
@@ -62,13 +55,6 @@ pub async fn v1_messages(
         )));
     }
 
-    if payload.stream == Some(false) {
-        error!("Streaming is required but was disabled by client (stream: false)");
-        return Err(AppError::from(anyhow::anyhow!(
-            "Streaming is required but was disabled"
-        )));
-    }
-
     let model_name = if let Some(inference_profile_arn) = inference_profile_arn {
         inference_profile_arn
     } else {
@@ -91,14 +77,22 @@ pub async fn v1_messages(
 
     payload.model = model_name;
 
-    let stream = BedrockV1MessagesProvider::new(state.bedrockruntime_client.clone())
-        .v1_messages_stream(
-            payload,
-            Some(response_model_id),
-            anthropic_beta,
-            usage_callback,
-        )
-        .await?;
+    let provider = BedrockV1MessagesProvider::new(state.bedrockruntime_client.clone());
 
-    Ok((StatusCode::OK, Sse::new(stream)))
+    if payload.stream == Some(true) {
+        let stream = provider
+            .v1_messages_stream(
+                payload,
+                Some(response_model_id),
+                anthropic_beta,
+                usage_callback,
+            )
+            .await?;
+        return Ok((StatusCode::OK, Sse::new(stream)).into_response());
+    }
+
+    let message = provider
+        .v1_messages(payload, Some(response_model_id), anthropic_beta, usage_callback)
+        .await?;
+    Ok((StatusCode::OK, Json(message)).into_response())
 }
