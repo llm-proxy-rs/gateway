@@ -5,7 +5,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
-use chrono::DateTime;
 use myerrors::AppError;
 use myhandlers::{AppState, ModelInfo, ModelsResponse};
 use tracing::error;
@@ -30,16 +29,7 @@ pub async fn v1_models(
         ));
     }
 
-    let model_infos: Vec<ModelInfo> = state
-        .model_configs
-        .iter()
-        .map(|model_config| ModelInfo {
-            id: model_config.anthropic_model_id.clone(),
-            display_name: model_config.anthropic_display_name.clone(),
-            created_at: DateTime::UNIX_EPOCH,
-            type_: "model".to_string(),
-        })
-        .collect();
+    let model_infos: Vec<ModelInfo> = state.model_configs.iter().map(ModelInfo::from).collect();
 
     let models_response = ModelsResponse {
         first_id: model_infos.first().map(|m| m.id.clone()),
