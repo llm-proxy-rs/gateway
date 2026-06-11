@@ -39,6 +39,7 @@ impl From<&ModelConfig> for ModelInfo {
             display_name: config.anthropic_display_name.clone(),
             max_input_tokens: config.max_input_tokens,
             max_tokens: config.max_tokens,
+            supports1m: config.max_input_tokens >= 1_000_000,
             created_at: DateTime::UNIX_EPOCH,
             type_: "model".to_string(),
         }
@@ -65,6 +66,7 @@ pub struct ModelInfo {
     pub display_name: String,
     pub max_input_tokens: u32,
     pub max_tokens: u32,
+    pub supports1m: bool,
     pub created_at: DateTime<Utc>,
     #[serde(rename = "type")]
     pub type_: String,
@@ -165,7 +167,23 @@ mod tests {
         assert_eq!(info.id, "claude-sonnet-4-6");
         assert_eq!(info.max_input_tokens, 1_000_000);
         assert_eq!(info.max_tokens, 64_000);
+        assert!(info.supports1m);
         assert_eq!(info.type_, "model");
+    }
+
+    #[test]
+    fn model_config_without_1m_context_sets_supports1m_false() {
+        let config = ModelConfig {
+            anthropic_model_id: "claude-haiku-4-5-20251001".to_string(),
+            anthropic_display_name: "Claude Haiku 4.5".to_string(),
+            bedrock_model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0".to_string(),
+            max_input_tokens: 200_000,
+            max_tokens: 64_000,
+        };
+
+        let info = ModelInfo::from(&config);
+
+        assert!(!info.supports1m);
     }
 
     #[test]
