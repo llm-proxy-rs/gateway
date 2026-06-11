@@ -92,7 +92,12 @@ pub async fn v1_messages(
     }
 
     let message = provider
-        .v1_messages(payload, Some(response_model_id), anthropic_beta, usage_callback)
+        .v1_messages(
+            payload,
+            Some(response_model_id),
+            anthropic_beta,
+            usage_callback,
+        )
         .await?;
     Ok((StatusCode::OK, Json(message)).into_response())
 }

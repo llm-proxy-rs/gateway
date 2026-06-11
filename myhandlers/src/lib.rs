@@ -13,11 +13,36 @@ use tower_sessions::Session;
 
 // ── Model config ─────────────────────────────────────────────────
 
+fn default_max_input_tokens() -> u32 {
+    200_000
+}
+
+fn default_max_tokens() -> u32 {
+    64_000
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct ModelConfig {
     pub anthropic_model_id: String,
     pub anthropic_display_name: String,
     pub bedrock_model_id: String,
+    #[serde(default = "default_max_input_tokens")]
+    pub max_input_tokens: u32,
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: u32,
+}
+
+impl From<&ModelConfig> for ModelInfo {
+    fn from(config: &ModelConfig) -> Self {
+        ModelInfo {
+            id: config.anthropic_model_id.clone(),
+            display_name: config.anthropic_display_name.clone(),
+            max_input_tokens: config.max_input_tokens,
+            max_tokens: config.max_tokens,
+            created_at: DateTime::UNIX_EPOCH,
+            type_: "model".to_string(),
+        }
+    }
 }
 
 /// Returns the Bedrock model ID for a given Anthropic model ID.
@@ -38,6 +63,8 @@ pub fn get_bedrock_model_id(
 pub struct ModelInfo {
     pub id: String,
     pub display_name: String,
+    pub max_input_tokens: u32,
+    pub max_tokens: u32,
     pub created_at: DateTime<Utc>,
     #[serde(rename = "type")]
     pub type_: String,
@@ -121,6 +148,24 @@ mod tests {
         ]
         .into_iter()
         .collect()
+    }
+
+    #[test]
+    fn model_config_to_model_info_exposes_1m_context() {
+        let config = ModelConfig {
+            anthropic_model_id: "claude-sonnet-4-6".to_string(),
+            anthropic_display_name: "Claude Sonnet 4.6".to_string(),
+            bedrock_model_id: "us.anthropic.claude-sonnet-4-6".to_string(),
+            max_input_tokens: 1_000_000,
+            max_tokens: 64_000,
+        };
+
+        let info = ModelInfo::from(&config);
+
+        assert_eq!(info.id, "claude-sonnet-4-6");
+        assert_eq!(info.max_input_tokens, 1_000_000);
+        assert_eq!(info.max_tokens, 64_000);
+        assert_eq!(info.type_, "model");
     }
 
     #[test]
