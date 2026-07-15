@@ -4,11 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-aws-sdk-bedrockruntime = "1.135.0"
+aws-credential-types = "1.3.0"
+aws-sdk-bedrockruntime = "1.136.0"
 axum = "0.8.9"
 chrono = { version = "0.4.45", features = ["serde"] }
 handlers = { git = "https://github.com/llm-proxy-rs/cognito.git", version = "0.1.0" }
 myerrors = { path = "../myerrors" }
+reqwest = "0.13.4"
 serde = { version = "1.0.228", features = ["derive"] }
 sqlx = { version = "0.9.0", features = ["postgres"] }
 tower-sessions = "0.15.0"

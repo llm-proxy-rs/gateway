@@ -30,7 +30,6 @@ use crate::database::setup_database;
 use crate::handlers::{
     add_model::{add_model_get, add_model_post},
     browse_models::browse_models_get,
-    chat_completions::chat_completions,
     disable_api_keys::{disable_api_keys_get, disable_api_keys_post},
     generate_api_key::{generate_api_key_get, generate_api_key_post},
     health::health,
@@ -39,6 +38,7 @@ use crate::handlers::{
     v1_messages::v1_messages,
     v1_messages_count_tokens::v1_messages_count_tokens,
     v1_models::v1_models,
+    v1_responses::v1_responses,
 };
 
 #[tokio::main]
@@ -68,6 +68,11 @@ async fn main() -> anyhow::Result<()> {
     let bedrockruntime_client = Client::new(&aws_config);
     info!("AWS Bedrock Runtime client initialized");
 
+    let credentials_provider = aws_config
+        .credentials_provider()
+        .ok_or_else(|| anyhow::anyhow!("No AWS credentials provider configured"))?;
+    let http_client = reqwest::Client::new();
+
     let anthropic_to_bedrock: HashMap<String, String> = app_config
         .models
         .iter()
@@ -87,7 +92,9 @@ async fn main() -> anyhow::Result<()> {
         cognito_redirect_uri: app_config.cognito_redirect_uri,
         cognito_region: app_config.cognito_region,
         cognito_user_pool_id: app_config.cognito_user_pool_id,
+        credentials_provider,
         db_pool: Arc::new(db_pool.clone()),
+        http_client,
         inference_profile_prefixes: app_config.inference_profile_prefixes,
         model_configs: app_config.models,
     };
@@ -114,12 +121,11 @@ async fn main() -> anyhow::Result<()> {
         .allow_origin(Any);
 
     let api = Router::new()
-        //.route("/chat/completions", post(chat_completions))
         .route("/api/v1/api-key", post(provision_api_key))
         .route("/v1/messages", post(v1_messages))
         .route("/v1/messages/count_tokens", post(v1_messages_count_tokens))
         .route("/v1/models", get(v1_models))
-        //.route("/models", get(models))
+        .route("/v1/responses", post(v1_responses))
         .layer(cors_layer)
         .layer(DefaultBodyLimit::max(20 * 1024 * 1024)); // 20 MB
 

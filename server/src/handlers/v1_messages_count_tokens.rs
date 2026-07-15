@@ -12,7 +12,7 @@ use myerrors::AppError;
 use myhandlers::{AppState, get_bedrock_model_id};
 use tracing::{error, info};
 
-use crate::validation::check_api_key_exists_and_model_exists;
+use crate::validation::{check_api_key_exists_and_model_exists, is_openai_model};
 
 pub async fn v1_messages_count_tokens(
     State(state): State<AppState>,
@@ -29,6 +29,17 @@ pub async fn v1_messages_count_tokens(
         .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "Invalid or missing API key"))?;
 
     payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
+
+    if is_openai_model(&payload.model) {
+        error!(
+            "OpenAI model '{}' is not supported on /v1/messages/count_tokens; use /v1/responses",
+            payload.model
+        );
+        return Err(AppError::new(
+            StatusCode::BAD_REQUEST,
+            "OpenAI models are only supported on /v1/responses",
+        ));
+    }
 
     let (api_key_exists, model_exists) =
         check_api_key_exists_and_model_exists(&state.db_pool, &api_key, &payload.model).await?;

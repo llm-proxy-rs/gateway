@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT openai_project_id\n        FROM projects\n        WHERE user_id = (SELECT user_id FROM api_keys WHERE api_key = $1)\n          AND model_id = (SELECT model_id FROM models WHERE model_name = $2 AND is_disabled = FALSE)\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "openai_project_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "openai_project_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e0e094d18df53e68ca78e19ad3945b2eec56bef0e54cdd1b35db8a4c448d30bb"
+}
