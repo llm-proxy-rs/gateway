@@ -13,7 +13,9 @@ use tracing::{debug, error, info};
 
 use crate::{
     handlers::usage_callback::create_usage_callback,
-    validation::{check_api_key_exists_and_model_exists_and_get_project_id, is_openai_model},
+    validation::{
+        check_api_key_exists_and_model_exists_and_get_openai_project_id, is_openai_model,
+    },
 };
 
 /// Transparent passthrough to Bedrock Mantle's OpenAI Responses API.
@@ -53,8 +55,12 @@ pub async fn v1_responses(
         .ok_or_else(|| AppError::new(StatusCode::UNAUTHORIZED, "Invalid or missing API key"))?;
 
     let (api_key_exists, model_exists, existing_project_id) =
-        check_api_key_exists_and_model_exists_and_get_project_id(&state.db_pool, &api_key, &model)
-            .await?;
+        check_api_key_exists_and_model_exists_and_get_openai_project_id(
+            &state.db_pool,
+            &api_key,
+            &model,
+        )
+        .await?;
 
     if !api_key_exists {
         error!("API key validation failed: Invalid API key");

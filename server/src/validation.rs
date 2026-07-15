@@ -69,7 +69,7 @@ pub async fn check_api_key_exists(pool: &PgPool, api_key: &str) -> anyhow::Resul
     Ok(result.unwrap_or(false))
 }
 
-pub async fn check_api_key_exists_and_model_exists_and_get_project_id(
+pub async fn check_api_key_exists_and_model_exists_and_get_openai_project_id(
     pool: &PgPool,
     api_key: &str,
     model_name: &str,
