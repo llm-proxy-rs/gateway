@@ -38,12 +38,14 @@ pub async fn create_inference_profile(
     .fetch_one(pool)
     .await?;
 
-    let user_id = ids
-        .user_id
-        .ok_or_else(|| anyhow::anyhow!("API key not found: {}", api_key))?;
-    let model_id = ids
-        .model_id
-        .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_name))?;
+    let user_id = ids.user_id.ok_or_else(|| {
+        error!("API key not found");
+        anyhow::anyhow!("API key not found")
+    })?;
+    let model_id = ids.model_id.ok_or_else(|| {
+        error!(%model_name, "Model not found");
+        anyhow::anyhow!("Model not found")
+    })?;
 
     let response = client
         .create_inference_profile()

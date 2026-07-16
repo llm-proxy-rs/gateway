@@ -85,12 +85,14 @@ pub async fn create_project(
     .fetch_one(pool)
     .await?;
 
-    let user_id = ids
-        .user_id
-        .ok_or_else(|| anyhow::anyhow!("API key not found: {}", api_key))?;
-    let model_id = ids
-        .model_id
-        .ok_or_else(|| anyhow::anyhow!("Model not found: {}", model_name))?;
+    let user_id = ids.user_id.ok_or_else(|| {
+        error!("API key not found");
+        anyhow::anyhow!("API key not found")
+    })?;
+    let model_id = ids.model_id.ok_or_else(|| {
+        error!(%model_name, "Model not found");
+        anyhow::anyhow!("Model not found")
+    })?;
 
     let project_name = Uuid::new_v4().to_string();
     let body = serde_json::json!({
@@ -126,15 +128,12 @@ pub async fn create_project(
     if !status.is_success() {
         let message = String::from_utf8_lossy(&response_body);
         error!(
-            "Failed to create Bedrock project '{}': {} {}",
-            project_name, status, message
+            project_name = %project_name,
+            %status,
+            upstream_body = %message,
+            "Failed to create Bedrock project"
         );
-        anyhow::bail!(
-            "Failed to create Bedrock project '{}': {} {}",
-            project_name,
-            status,
-            message
-        );
+        anyhow::bail!("Failed to create Bedrock project");
     }
 
     let created: CreateProjectResponse = serde_json::from_slice(&response_body)?;
