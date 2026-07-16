@@ -15,6 +15,7 @@ use crate::{
     handlers::usage_callback::create_usage_callback,
     validation::{
         check_api_key_exists_and_model_exists_and_get_openai_project_id, is_openai_model,
+        normalize_openai_model_id,
     },
 };
 
@@ -27,17 +28,21 @@ pub async fn v1_responses(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response, AppError> {
-    let model = serde_json::from_slice::<serde_json::Value>(&body)
-        .ok()
-        .and_then(|value| {
-            value
-                .get("model")
-                .and_then(|m| m.as_str())
-                .map(str::to_owned)
-        })
+    let mut payload = serde_json::from_slice::<serde_json::Value>(&body)
+        .map_err(|_| AppError::new(StatusCode::BAD_REQUEST, "Invalid JSON body"))?;
+
+    let raw_model = payload
+        .get("model")
+        .and_then(|m| m.as_str())
+        .map(str::to_owned)
         .ok_or_else(|| AppError::new(StatusCode::BAD_REQUEST, "Missing or invalid model"))?;
 
-    debug!("Received v1/responses request for model: {}", model);
+    let model = normalize_openai_model_id(&raw_model);
+
+    debug!(
+        "Received v1/responses request for model: {} (from {})",
+        model, raw_model
+    );
 
     if !is_openai_model(&model) {
         error!(
@@ -102,8 +107,17 @@ pub async fn v1_responses(
         state.aws_region.clone(),
         state.credentials_provider.clone(),
     );
+
+    let upstream_body = if model != raw_model {
+        payload["model"] = serde_json::Value::String(model.clone());
+        serde_json::to_vec(&payload)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize normalized request body: {}", e))?
+    } else {
+        body.to_vec()
+    };
+
     let upstream = provider
-        .v1_responses_stream(body.to_vec(), Some(&project_id), usage_callback)
+        .v1_responses_stream(upstream_body, Some(&project_id), usage_callback)
         .await?;
 
     let status = StatusCode::from_u16(upstream.status.as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
