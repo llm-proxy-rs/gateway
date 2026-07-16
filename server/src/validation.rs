@@ -1,16 +1,8 @@
 use sqlx::PgPool;
 
+/// Bedrock Mantle / OpenAI-compatible model IDs use the `openai.` prefix.
 pub fn is_openai_model(model_name: &str) -> bool {
-    let model_name = model_name.to_ascii_lowercase();
-    model_name.starts_with("openai.") || model_name.starts_with("gpt-")
-}
-
-pub fn normalize_openai_model_id(model_name: &str) -> String {
-    if model_name.to_ascii_lowercase().starts_with("gpt-") {
-        format!("openai.{model_name}")
-    } else {
-        model_name.to_string()
-    }
+    model_name.to_ascii_lowercase().starts_with("openai.")
 }
 
 pub async fn check_api_key_exists_and_model_exists(
@@ -118,8 +110,6 @@ mod tests {
         assert!(is_openai_model("openai.gpt-5.6-luna"));
         assert!(is_openai_model("openai.gpt-5.6-terra"));
         assert!(is_openai_model("OpenAI.gpt-5.6-sol"));
-        assert!(is_openai_model("gpt-5.6-sol"));
-        assert!(is_openai_model("GPT-5.6-sol"));
     }
 
     #[test]
@@ -127,41 +117,5 @@ mod tests {
         assert!(!is_openai_model("us.anthropic.claude-sonnet-4-6"));
         assert!(!is_openai_model("global.anthropic.claude-sonnet-5"));
         assert!(!is_openai_model("claude-opus-4-6"));
-    }
-
-    #[test]
-    fn codex_bare_gpt_ids_get_openai_prefix() {
-        assert_eq!(
-            normalize_openai_model_id("gpt-5.6-sol"),
-            "openai.gpt-5.6-sol"
-        );
-        assert_eq!(
-            normalize_openai_model_id("gpt-5.6-luna"),
-            "openai.gpt-5.6-luna"
-        );
-        assert_eq!(
-            normalize_openai_model_id("GPT-5.6-sol"),
-            "openai.GPT-5.6-sol"
-        );
-    }
-
-    #[test]
-    fn already_prefixed_gpt_ids_pass_through() {
-        assert_eq!(
-            normalize_openai_model_id("openai.gpt-5.6-sol"),
-            "openai.gpt-5.6-sol"
-        );
-    }
-
-    #[test]
-    fn non_openai_ids_pass_through_unchanged() {
-        assert_eq!(
-            normalize_openai_model_id("us.anthropic.claude-sonnet-4-6"),
-            "us.anthropic.claude-sonnet-4-6"
-        );
-        assert_eq!(
-            normalize_openai_model_id("claude-opus-4-6"),
-            "claude-opus-4-6"
-        );
     }
 }
