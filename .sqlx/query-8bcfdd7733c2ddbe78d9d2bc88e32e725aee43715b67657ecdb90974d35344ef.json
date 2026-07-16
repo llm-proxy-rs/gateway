@@ -6,17 +6,35 @@
       {
         "ordinal": 0,
         "name": "model_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "models",
+            "name": "model_name"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "protected",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "models",
+            "name": "protected"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "is_disabled",
-        "type_info": "Bool"
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "models",
+            "name": "is_disabled"
+          }
+        }
       }
     ],
     "parameters": {

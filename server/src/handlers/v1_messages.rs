@@ -15,7 +15,9 @@ use tracing::{debug, error, info};
 
 use crate::{
     handlers::usage_callback::create_usage_callback,
-    validation::check_api_key_exists_and_model_exists_and_get_inference_profile_arn,
+    validation::{
+        check_api_key_exists_and_model_exists_and_get_inference_profile_arn, is_openai_model,
+    },
 };
 
 pub async fn v1_messages(
@@ -31,6 +33,17 @@ pub async fn v1_messages(
 
     let response_model_id = payload.model.clone();
     payload.model = get_bedrock_model_id(&state.anthropic_to_bedrock, &payload.model);
+
+    if is_openai_model(&payload.model) {
+        error!(
+            "OpenAI model '{}' is not supported on /v1/messages; use /v1/responses",
+            payload.model
+        );
+        return Err(AppError::new(
+            StatusCode::BAD_REQUEST,
+            "OpenAI models are only supported on /v1/responses",
+        ));
+    }
 
     let (api_key_exists, model_exists, inference_profile_arn) =
         check_api_key_exists_and_model_exists_and_get_inference_profile_arn(

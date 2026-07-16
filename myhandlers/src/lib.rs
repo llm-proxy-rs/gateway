@@ -1,3 +1,4 @@
+use aws_credential_types::provider::SharedCredentialsProvider;
 use aws_sdk_bedrockruntime::Client;
 use axum::{
     extract::{Query, State},
@@ -94,7 +95,9 @@ pub struct AppState {
     pub cognito_redirect_uri: String,
     pub cognito_region: String,
     pub cognito_user_pool_id: String,
+    pub credentials_provider: SharedCredentialsProvider,
     pub db_pool: Arc<PgPool>,
+    pub http_client: reqwest::Client,
     pub inference_profile_prefixes: Vec<String>,
     pub anthropic_to_bedrock: HashMap<String, String>,
     pub model_configs: Vec<ModelConfig>,

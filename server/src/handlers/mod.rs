@@ -1,6 +1,5 @@
 pub mod add_model;
 pub mod browse_models;
-pub mod chat_completions;
 pub mod delete_model;
 pub mod disable_api_keys;
 pub mod disable_model;
@@ -14,3 +13,4 @@ pub mod usage_callback;
 pub mod v1_messages;
 pub mod v1_messages_count_tokens;
 pub mod v1_models;
+pub mod v1_responses;
