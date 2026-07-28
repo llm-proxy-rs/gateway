@@ -37,6 +37,7 @@ fn default_anthropic_beta_whitelist() -> Vec<String> {
         "context-1m-2025-08-07".to_string(),
         "effort-2025-11-24".to_string(),
         "interleaved-thinking-2025-05-14".to_string(),
+        "mid-conversation-tool-changes-2026-07-01".to_string(),
         "structured-outputs-2025-12-15".to_string(),
     ]
 }
