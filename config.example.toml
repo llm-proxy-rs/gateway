@@ -26,6 +26,13 @@ csrf_salt = "your_csrf_salt"
 
 # Model Mapping (Anthropic model ID -> Bedrock model ID)
 [[models]]
+anthropic_model_id = "claude-opus-5-5"
+anthropic_display_name = "Claude Opus 5.5"
+bedrock_model_id = "global.anthropic.claude-opus-5-5"
+max_input_tokens = 1000000
+max_tokens = 128000
+
+[[models]]
 anthropic_model_id = "claude-opus-4-6"
 anthropic_display_name = "Claude Opus 4.6"
 bedrock_model_id = "us.anthropic.claude-opus-4-6-v1"
